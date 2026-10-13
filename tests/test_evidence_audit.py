@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 
 from mujoco_sysid_lab.provenance import collect_provenance, sha256_file, snapshot_sources, write_json
+from mujoco_sysid_lab.experiment_config import config_to_dict, load_ground_truth, load_study_config
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -163,3 +164,77 @@ def test_incomplete_execution_cannot_be_certified(tmp_path):
     write_json(path, {"schema_version": "mujoco-sysid-lab.full-run.v1", "status": "incomplete"})
     with pytest.raises(ValueError, match="incomplete"):
         audit.audit_run(tmp_path, path)
+
+
+@pytest.fixture
+def mechanics():
+    study = load_study_config(ROOT/"configs/evidence_v1.json")
+    truth = load_ground_truth(study.truth_config_path, study)
+    return study, truth.model
+
+
+def unit_fixture(cell, study, truth):
+    """Labeled raw-layout fixture, not an optimization or evidence fit."""
+    initial = config_to_dict(study.nominal)
+    if cell == "A1":
+        initial["damping_nm_s_per_rad"] = truth.damping_nm_s_per_rad
+        free, vector = ("mass_kg",), np.array([1.1999])
+    else:
+        initial["mass_kg"] = truth.mass_kg
+        free, vector = ("damping_nm_s_per_rad",), np.array([.15002])
+    raw = {"schema_version": "mujoco-sysid-lab.training-fit.v2", "initial_physics": initial,
+           "free_parameters": list(free)}
+    retained = {"cell": cell, "initial_physics": dict(initial)}
+    return raw, retained, free, vector
+
+
+@pytest.mark.parametrize("cell", ["A1", "A2"])
+def test_fresh_unit_physics_uses_native_free_value_and_known_true_nuisance(mechanics, cell):
+    study, truth = mechanics
+    raw, retained, free, vector = unit_fixture(cell, study, truth)
+    original = json.dumps(raw, sort_keys=True)
+    physical = audit.candidate_physics(retained, raw, free, vector, study, truth)
+    assert physical[free[0]] == vector[0]
+    nuisance = "damping_nm_s_per_rad" if cell == "A1" else "mass_kg"
+    assert physical[nuisance] == getattr(truth, nuisance)
+    assert physical[nuisance] != getattr(study.nominal, nuisance)
+    assert json.dumps(raw, sort_keys=True) == original
+
+
+@pytest.mark.parametrize("origin", ["raw", "retained"])
+def test_explicit_cached_physics_must_match_native_reconstruction(mechanics, origin):
+    study, truth = mechanics
+    raw, retained, free, vector = unit_fixture("A1", study, truth)
+    physical = audit.candidate_physics(retained, raw, free, vector, study, truth)
+    record = raw if origin == "raw" else retained
+    record["fitted_physics"] = dict(physical)
+    assert audit.candidate_physics(retained, raw, free, vector, study, truth) == physical
+    record["fitted_physics"]["mass_kg"] += .0001
+    with pytest.raises(ValueError, match=f"Explicit {origin} fitted physics"):
+        audit.candidate_physics(retained, raw, free, vector, study, truth)
+
+
+@pytest.mark.parametrize("cell", ["A1", "A2"])
+def test_nominal_unit_nuisance_cannot_be_assumed_or_certified(mechanics, cell):
+    study, truth = mechanics
+    raw, retained, free, vector = unit_fixture(cell, study, truth)
+    nuisance = "damping_nm_s_per_rad" if cell == "A1" else "mass_kg"
+    raw["initial_physics"][nuisance] = getattr(study.nominal, nuisance)
+    retained["initial_physics"] = dict(raw["initial_physics"])
+    with pytest.raises(ValueError, match="oracle-assisted fixed"):
+        audit.candidate_physics(retained, raw, free, vector, study, truth)
+
+
+def test_retained_initial_physics_must_match_hashed_raw_record(mechanics):
+    study, truth = mechanics
+    raw, retained, free, vector = unit_fixture("A1", study, truth)
+    retained["initial_physics"]["mass_kg"] += .01
+    with pytest.raises(ValueError, match="Retained/raw initial physics"):
+        audit.candidate_physics(retained, raw, free, vector, study, truth)
+
+
+def test_delay_only_reconstruction_preserves_training_selected_fixed_physics(mechanics):
+    study, truth = mechanics
+    initial = {**config_to_dict(study.nominal), "mass_kg": 1.19985, "damping_nm_s_per_rad": .15003}
+    raw = {"initial_physics": initial, "free_parameters": ["delay_s"]}
+    assert audit.candidate_physics({"cell": "C_delay_only"}, raw, ("delay_s",), np.array([.02398]), study, truth) == initial

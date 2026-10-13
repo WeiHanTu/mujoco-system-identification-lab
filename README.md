@@ -69,7 +69,7 @@ Training uses separate eight-second multisine and piecewise-constant trajectorie
 
 The estimator sees restricted training observations and known/nominal constants. Truth is used for generation and after-selection evaluation; the explicitly oracle-assisted single-parameter checks are the controlled exception. Starts, seeds, bounds, metrics, solver settings, and targets were [registered before fitting](docs/results/registration_v1.json). No threshold was loosened to improve outcomes.
 
-The official pipeline uses `MjSpec`, `ParameterDict`, `TimeSeries`, explicit initial state, `ModelSequences`, `build_residual_fn`, `sysid.optimize` with `scipy_parallel_fd`, and official native/HTML reporting. Installed API/timing defects required a narrow, tested adapter; [spec.md](spec.md) documents those corrections. Full-precision MJB/native arrays accompany rounded XML. Local confidence intervals do not imply true-physics coverage under mismatch.
+The official pipeline uses `MjSpec`, `ParameterDict`, `TimeSeries`, explicit initial state, `ModelSequences`, `build_residual_fn`, `sysid.optimize` with `scipy_parallel_fd`, and official native/HTML reporting. Verified API differences and rollout/delay timing behavior required a narrow, tested adapter; [spec.md](spec.md) documents the exact conventions. Full-precision MJB/native arrays accompany rounded XML. Local confidence intervals do not imply true-physics coverage under mismatch.
 
 ## Verification and scope
 

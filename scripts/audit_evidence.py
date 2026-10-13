@@ -242,6 +242,45 @@ def fit_ref(root, directory, reference):
     return verified_ref(base, reference)
 
 
+def candidate_physics(retained, raw, free, native_vector, study, truth_model):
+    """Reconstruct candidate mechanics from the hashed raw fit, including unit nuisances.
+
+    Fresh training-fit.v2 rows need not duplicate fitted_physics. Initial
+    mechanics are authoritative for fixed quantities; native free values are
+    authoritative for estimates. Explicit old/new records are consistency
+    checks, never a substitute for this reconstruction.
+    """
+    fields = set(config_to_dict(study.nominal))
+    initial = raw.get("initial_physics")
+    require(isinstance(initial, dict) and set(initial) == fields, "Raw initial physics schema differs")
+    require(all(type(value) in (int, float) and np.isfinite(value) for value in initial.values()),
+            "Raw initial physics is not finite numeric mechanics")
+    require(tuple(raw["free_parameters"]) == tuple(free), "Raw free-parameter order differs")
+    vector = np.asarray(native_vector)
+    require(vector.shape == (len(free),) and np.isfinite(vector).all(), "Native parameter vector shape/values differ")
+    if retained.get("initial_physics") is not None:
+        require(retained["initial_physics"] == initial, "Retained/raw initial physics disagree")
+    for name, expected in config_to_dict(study.nominal).items():
+        if name not in ("mass_kg", "damping_nm_s_per_rad"):
+            require(initial[name] == expected, f"Fixed raw initial mechanics changed: {name}")
+    if retained["cell"] == "A1":
+        require(tuple(free) == ("mass_kg",), "A1 must estimate only mass")
+        require(initial["damping_nm_s_per_rad"] == truth_model.damping_nm_s_per_rad,
+                "A1 oracle-assisted fixed damping differs from truth")
+    elif retained["cell"] == "A2":
+        require(tuple(free) == ("damping_nm_s_per_rad",), "A2 must estimate only damping")
+        require(initial["mass_kg"] == truth_model.mass_kg, "A2 oracle-assisted fixed mass differs from truth")
+    physical = dict(initial)
+    for name, value in zip(free, vector, strict=True):
+        require(name in ("mass_kg", "damping_nm_s_per_rad", "delay_s"), "Unknown native free parameter")
+        if name != "delay_s":
+            physical[name] = float(value)
+    for origin, record in (("raw", raw), ("retained", retained)):
+        if record.get("fitted_physics") is not None:
+            require(record["fitted_physics"] == physical, f"Explicit {origin} fitted physics disagrees with native reconstruction")
+    return physical
+
+
 def audit_model(model, physical):
     close(model.body_mass[1], physical["mass_kg"], "MJB fitted mass", atol=1e-14, rtol=1e-14)
     close(model.dof_damping[0], physical["damping_nm_s_per_rad"], "MJB fitted damping", atol=1e-14, rtol=1e-14)
@@ -396,7 +435,7 @@ def audit_run(root, run_path):
         close(native.x, retained["optimized_vector"], f"Retained vector {fit_id}", atol=0., rtol=0.)
         close(native.cost, retained["final_objective"], f"Retained objective {fit_id}")
         model = mujoco.MjModel.from_binary_path(str(verified_ref(official, files["pendulum.mjb"])))
-        physical = retained.get("fitted_physics", raw.get("fitted_physics"))
+        physical = candidate_physics(retained, raw, free, native.x, study, truth.model)
         audit_model(model, physical)
         for name, value in config_to_dict(study.nominal).items():
             if name not in ("mass_kg", "damping_nm_s_per_rad"):
@@ -429,6 +468,8 @@ def audit_run(root, run_path):
         fitted_rows[fit_id] = {"fit_id": fit_id, "cell": cell, "seed": retained["seed"],
                 "start_id": retained["start_id"], "final_objective": float(native.cost),
                 "optimized_vector": native.x.tolist(), "source_result": retained["source_result"],
+                "physics_basis": "hashed raw initial mechanics plus native free-parameter vector; explicit fields checked when present",
+                "oracle_assisted_fixed_nuisance_verified": cell in ("A1", "A2"),
                 "native_nfev": int(native.nfev), "native_njev": int(native.njev),
                 "jacobian_shape": list(native.jac.shape), "optimization_call_counts": counts["optimization"],
                 "maximum_independent_residual_error": float(np.max(np.abs(residual - arrays["final"]))),
