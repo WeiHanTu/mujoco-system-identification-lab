@@ -40,6 +40,10 @@ def load_spec(model_path: Path, config: ModelConfig) -> mujoco.MjSpec:
     hinge = spec.joint("hinge")
     geom = spec.geom("link_geometry")
     motor = spec.actuator("torque")
+    for kind, name, node in (("body", "link", link), ("joint", "hinge", hinge),
+                             ("geom", "link_geometry", geom), ("actuator", "torque", motor)):
+        if node is None:
+            raise ValueError(f"pendulum model requires named {kind} {name!r}")
     link.mass = config.mass_kg
     link.inertia = config.inertia_at_com_kg_m2
     link.ipos = [0.0, 0.0, -config.link_length_m / 2]
@@ -61,11 +65,29 @@ def load_spec(model_path: Path, config: ModelConfig) -> mujoco.MjSpec:
     return spec
 
 
+def _validate_model_contract(model: mujoco.MjModel) -> None:
+    """Require the named hinge/sensor layout before assigning physical units."""
+    if (model.nq, model.nv, model.nu, model.na, model.nsensor, model.nsensordata) != (1, 1, 1, 0, 2, 2):
+        raise ValueError("pendulum model requires nq=nv=nu=1, na=0 and two scalar sensors")
+    hinge_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, "hinge")
+    if (model.njnt != 1 or hinge_id != 0
+            or model.jnt_type[hinge_id] != mujoco.mjtJoint.mjJNT_HINGE):
+        raise ValueError("pendulum model requires exactly the named hinge joint")
+    for address, (name, sensor_type) in enumerate(
+        (("qpos", mujoco.mjtSensor.mjSENS_JOINTPOS), ("qvel", mujoco.mjtSensor.mjSENS_JOINTVEL))
+    ):
+        sensor_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SENSOR, name)
+        if (sensor_id < 0 or model.sensor_type[sensor_id] != sensor_type
+                or model.sensor_objtype[sensor_id] != mujoco.mjtObj.mjOBJ_JOINT
+                or model.sensor_objid[sensor_id] != hinge_id or model.sensor_dim[sensor_id] != 1
+                or model.sensor_adr[sensor_id] != address):
+            raise ValueError("pendulum sensors must be named jointpos qpos then jointvel qvel on the hinge")
+
+
 def compile_model(model_path: Path, config: ModelConfig) -> mujoco.MjModel:
     """Compile stamped MjSpec and check the one-DOF sensor/actuator contract."""
     model = load_spec(model_path, config).compile()
-    if (model.nq, model.nv, model.nu, model.nsensordata) != (1, 1, 1, 2):
-        raise ValueError("pendulum model requires nq=nv=nu=1 and two scalar sensors")
+    _validate_model_contract(model)
     return model
 
 
@@ -83,6 +105,7 @@ def simulate(
     mj_forward refreshes them at the new state before that state is recorded.
     No rendering, process noise, measurement noise, or state refitting occurs.
     """
+    _validate_model_contract(model)
     timestamps = np.array(times, dtype=np.float64, copy=True)
     inputs = np.array(controls, dtype=np.float64, copy=True)
     if timestamps.ndim != 1 or timestamps.size < 2:
@@ -100,8 +123,6 @@ def simulate(
     expected = np.arange(timestamps.size, dtype=np.float64) * model.opt.timestep
     if not np.allclose(timestamps, expected, rtol=0, atol=1e-12):
         raise ValueError("timestamps must be strictly increasing and match the simulation timestep")
-    if (model.nq, model.nv, model.nu, model.nsensordata) != (1, 1, 1, 2):
-        raise ValueError("simulate requires the authored one-DOF, two-sensor model")
     lower, upper = model.actuator_ctrlrange[0]
     if lower >= upper:
         raise ValueError("model must register a nonempty actuator control range")

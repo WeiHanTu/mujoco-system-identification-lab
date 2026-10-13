@@ -56,11 +56,18 @@ def test_evaluation_only_milestone_five_has_a_dedicated_command():
 
 
 @pytest.mark.parametrize("fit_status", [0, 1])
-def test_full_command_curates_only_after_completed_fitting(monkeypatch, fit_status):
+@pytest.mark.parametrize("external_interpreter", [False, True])
+def test_full_command_curates_only_after_completed_fitting(monkeypatch, fit_status, external_interpreter):
     from mujoco_sysid_lab import study_runner, final_reporting
     (ROOT / "artifacts").mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(dir=ROOT / "artifacts") as temporary:
         output = Path(temporary) / "new_run"
+        if external_interpreter:
+            executable = str(Path(tempfile.gettempdir())/"external-sysid-python"/"python")
+            monkeypatch.setattr(sys, "executable", executable)
+        else:
+            path = Path(sys.executable).absolute()
+            executable = path.relative_to(ROOT).as_posix() if path.is_relative_to(ROOT) else str(path)
         events = []
 
         def fitted(root, args, target, *, through):
@@ -76,6 +83,7 @@ def test_full_command_curates_only_after_completed_fitting(monkeypatch, fit_stat
             assert source == output / "run.json" and source.is_file()
             assert target == output / "curation"
             assert command[1] == "scripts/run_experiment.py"
+            assert command[0] == executable
             events.append("public_curation")
             return {"status": "passed"}
 

@@ -30,10 +30,18 @@ def test_joint_registration_does_not_deserialize_truth_file(monkeypatch):
 
 
 @pytest.mark.parametrize("valid_candidate", [False, True])
-def test_truth_loader_runs_only_after_selection_and_failures_are_counted(monkeypatch, valid_candidate):
+@pytest.mark.parametrize("external_interpreter", [False, True])
+def test_truth_loader_runs_only_after_selection_and_failures_are_counted(monkeypatch, valid_candidate, external_interpreter):
     (ROOT / "artifacts").mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(dir=ROOT / "artifacts") as temporary:
         base = Path(temporary)
+        if external_interpreter:
+            # An interpreter outside the checkout must remain usable. This
+            # labeled path exercises argv/provenance formatting; explicit data
+            # and mocked fitting keep the test from launching that interpreter.
+            external_path = Path(tempfile.gettempdir()) / "sysid-external-interpreter" / "python"
+            assert not external_path.is_relative_to(ROOT)
+            monkeypatch.setattr(experiment.sys, "executable", str(external_path))
         output = base / "run"
         manifest = base / "manifest.json"
         write_json(manifest, {
@@ -82,4 +90,7 @@ def test_truth_loader_runs_only_after_selection_and_failures_are_counted(monkeyp
         assert result["registered_evidence_fits_this_milestone"] == 0
         assert result["cumulative_registered_evidence_fit_count"] == 2
         assert result["heldout_evaluated"] is False
+        if external_interpreter:
+            assert result["provenance"]["command"]["argv"][0] == str(external_path)
+            assert result["provenance"]["python"]["executable_scope"] == "absolute"
         assert events == ["three_attempts", "selection_sealed"] + (["truth_evaluation"] if valid_candidate else [])

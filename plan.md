@@ -6,7 +6,7 @@ Status: Milestones 1–9 are verified. All 82 registered fits, final tests, brow
 
 Milestones 1–3 established deterministic simulation/data, frozen registration, and independent unit recovery. Milestone 4 sealed the seed-101 joint winner before truth evaluation; Milestone 5 scored untouched controls without refitting. Milestone 6 verified delay-only recovery before joint delay estimation. The full matrix then completed all 82 fits, including five seeds and three starts, with no missing rows or bound hits. The step ablation succeeded in this controlled system; the omitted-force fit improved prediction while biasing damping by about 37.5%. The retained full invocation took 57.17 s with 70 new fits and 12 immutable earlier fits reused. See docs/results/summary.json and docs/milestones for exact evidence and limitations.
 
-The user supplied `https://github.com/WeiHanTu/mujoco-system-identification-lab.git`. A read-only Git check found no advertised branches or tags; the existing local repository is connected to it as origin. The user subsequently approved the plan and authorized Milestone 1. No remote publication has been requested.
+The user supplied `https://github.com/WeiHanTu/mujoco-system-identification-lab.git`. A read-only Git check found no advertised branches or tags; the existing local repository is connected to it as origin. The user subsequently approved the plan and authorized Milestone 1. On 2026-10-13 the user also explicitly requested a public repository audit, concrete fixes, verification, commit, and push. Private notes and raw archives remain excluded from Git publication.
 
 The proposed dependencies, experiment matrix, acceptance targets, and claim boundaries were shown before approval. Milestone 1 verified released imports/API contracts, deterministic CPU simulation, and provenance. Its local suite passed 86 tests, with upstream warnings retained. See docs/milestones/01_environment.md and docs/results/milestone1.json. The user subsequently approved all remaining work through Milestone 9. The frozen configuration remains unchanged.
 
@@ -92,17 +92,17 @@ Gate: requested artifacts exist, appropriate checks pass, retained failures are 
 
 Keep modules small: config validation, authored excitation/simulation, dataset IO, official SysID plumbing, shared evaluation, reporting/provenance, and experiment orchestration under src/mujoco_sysid_lab/. Avoid GPU/MJX, robotics middleware, a service layer, or an additional optimizer.
 
-The following are proposed future command interfaces, not commands run during planning:
+The following implemented interfaces supersede the original planning examples:
 
 ```sh
 uv sync --locked --python 3.12.5
 uv run --locked python scripts/generate_data.py --config configs/evidence_v1.json
 uv run --locked python scripts/run_experiment.py --config configs/evidence_v1.json
 uv run --locked pytest
-uv run --locked python scripts/run_experiment.py --config configs/smoke_v1.json
+uv run --locked python scripts/run_smoke.py --config configs/smoke_v1.json
 ```
 
-The full runner generates/verifies cached datasets, runs all authorized registered cells, evaluates splits, and writes reports/plots/provenance with one command. Data generation is also exposed independently. It exits nonzero on invalid configs, contract failures, or incomplete execution, while writing partial evidence and reasons. Scientific target failures remain data and are clearly reported; an optional strict-criteria flag can make them a nonzero exit without disguising them as crashes.
+The full runner generates/verifies cached datasets, runs all authorized registered cells, evaluates splits, and writes reports/plots/provenance with one command. Data generation is also exposed independently. It exits nonzero on invalid configs, contract failures, or incomplete execution, while writing partial evidence and reasons. Scientific target failures remain data and are clearly reported in the criteria; no strict-criteria CLI flag is implemented.
 
 Smoke uses a separate labeled config (short duration, seed 101, one joint start) and cannot overwrite full evidence. Its timing and threshold choices cannot be presented as the full study's success criteria. Target local runtime is <=60 s for smoke and <=15 minutes for full evidence; profiling, not confidence, decides whether the target was met.
 

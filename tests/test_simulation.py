@@ -128,3 +128,49 @@ def test_invalid_trajectory_inputs_are_rejected(model, times, controls, error):
 def test_nonfinite_initial_state_is_rejected(model):
     with pytest.raises(ValueError, match="initial qpos and qvel must be finite"):
         simulate(model, np.array([0, 0.002]), np.zeros(2), initial_qpos=float("nan"))
+
+
+@pytest.mark.parametrize("change,error", [
+    ("reordered_sensors", "sensors must be named"),
+    ("activation", "na=0"),
+    ("slide", "named hinge joint"),
+])
+@pytest.mark.parametrize("entry_point", ["compile", "simulate"])
+def test_matching_dimensions_do_not_admit_unsupported_model_semantics(tmp_path, config, change, error, entry_point):
+    xml = MODEL_PATH.read_text()
+    if change == "reordered_sensors":
+        xml = xml.replace(
+            '<jointpos name="qpos" joint="hinge"/>\n    <jointvel name="qvel" joint="hinge"/>',
+            '<jointvel name="qvel" joint="hinge"/>\n    <jointpos name="qpos" joint="hinge"/>',
+        )
+    elif change == "activation":
+        xml = xml.replace(
+            '<motor name="torque" joint="hinge" gear="1" ctrllimited="false"/>',
+            '<general name="torque" joint="hinge" gear="1" dyntype="filter" dynprm="0.1" ctrllimited="false"/>',
+        )
+    else:
+        xml = xml.replace('type="hinge"', 'type="slide"')
+    assert xml != MODEL_PATH.read_text()
+    if entry_point == "compile":
+        altered = tmp_path/"unsupported.xml"
+        altered.write_text(xml)
+        with pytest.raises(ValueError, match=error):
+            compile_model(altered, config.ground_truth)
+    else:
+        unsupported = mujoco.MjModel.from_xml_string(xml)
+        assert (unsupported.nq, unsupported.nv, unsupported.nu, unsupported.nsensordata) == (1, 1, 1, 2)
+        unsupported.actuator_ctrlrange[0] = [-1.5, 1.5]
+        with pytest.raises(ValueError, match=error):
+            simulate(unsupported, np.arange(2)*.002, np.zeros((2, 1)), initial_qpos=.1, initial_qvel=-.2)
+
+
+@pytest.mark.parametrize("required_name", ["link", "hinge", "link_geometry", "torque"])
+def test_missing_named_model_node_is_rejected_before_stamping(tmp_path, config, required_name):
+    # Rename references too, so the MJCF is otherwise a valid one-joint model.
+    xml = MODEL_PATH.read_text().replace(f'name="{required_name}"', f'name="other_{required_name}"')
+    if required_name == "hinge":
+        xml = xml.replace('joint="hinge"', 'joint="other_hinge"')
+    altered = tmp_path/"renamed.xml"
+    altered.write_text(xml)
+    with pytest.raises(ValueError, match=f"requires named .*{required_name}"):
+        compile_model(altered, config.ground_truth)

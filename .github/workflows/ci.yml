@@ -41,6 +41,9 @@ jobs:
         run: |
           mkdir -p artifacts/ci
           .venv/bin/python -m pytest 2>&1 | tee artifacts/ci/pytest.log
+      - name: Build wheel and source distribution
+        if: always() && steps.dependencies.outcome == 'success'
+        run: uv build --python .venv/bin/python --out-dir artifacts/ci/dist
       - name: One-seed CPU smoke
         if: always() && steps.dependencies.outcome == 'success'
         run: .venv/bin/python scripts/run_smoke.py --config configs/smoke_v1.json --output artifacts/ci/smoke

@@ -64,13 +64,17 @@ def test_smoke_json_requires_finite_unique_fields(tmp_path, contents, error):
         smoke.load_smoke_config(path)
 
 
-def test_ci_pins_actions_python_uv_and_always_retains_evidence():
+def test_ci_pins_verification_builds_distributions_and_retains_evidence():
     workflow = (ROOT/".github/workflows/ci.yml").read_text()
     assert workflow.count("uses:") == 3
     assert len(re.findall(r"uses: [\w/-]+@[0-9a-f]{40}", workflow)) == 3
     assert 'python-version: "3.12.5"' in workflow
     assert "uv==0.12.10" in workflow and "uv sync --locked --python 3.12.5" in workflow
     assert "scripts/run_smoke.py" in workflow and "if: always()" in workflow
+    # The declared build destination is within the retained artifact tree:
+    # remote verification must exercise both distribution builds as well as
+    # tests/smoke, preserving package outputs for exact-commit inspection.
+    assert "uv build --python .venv/bin/python --out-dir artifacts/ci/dist" in workflow
     assert "path: artifacts/ci/" in workflow
 
 

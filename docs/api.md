@@ -1,6 +1,6 @@
 # Project interfaces
 
-This is a repository-driven experiment, rather than a general robot-identification library. The supported entry points are the scripts in `scripts/`; the small Python package separates validated inputs, fitting, and post-selection evaluation.
+This is a repository-driven experiment. The primary entry points are [generate_data.py](../scripts/generate_data.py), [run_experiment.py](../scripts/run_experiment.py), and [run_smoke.py](../scripts/run_smoke.py). [audit_evidence.py](../scripts/audit_evidence.py) and [archive_evidence.py](../scripts/archive_evidence.py) inspect retained runs. Other scripts reproduce or repair historical checkpoints and require the referenced inputs. The Python interfaces below expose internal review seams; they do not promise a stable general robot-identification SDK.
 
 ## Estimation boundary
 
@@ -44,7 +44,7 @@ This example supplies no physical truth or held-out trajectory. Use the full run
 | `measured_qvel` | `(N, 1)` | Radians/second. |
 | `initial_state` | `(3,)` | Explicit `mjSTATE_FULLPHYSICS`: `[time, qpos, qvel]`; known equilibrium reset, not fitted noisy observations. |
 
-All numeric arrays must be finite. The model contract is `nq=nv=nu=1`, `na=0`, with exactly the named joint-position and joint-velocity sensors. The adapter does not support arbitrary sensors or robots.
+All numeric arrays must be finite. Compilation and simulation require `nq=nv=nu=1`, `na=0`, one named hinge, and the two scalar sensors targeting that hinge in position-then-velocity order. Unsupported activation dynamics, joints, or sensor layouts raise `ValueError`. The adapter does not support arbitrary sensors or robots.
 
 The registered 2 ms timestep and common observation window `[0.06, T-0.06]` apply to every fitting candidate and baseline. A positive shared delay means `measured(t) = clean(t-delay) + noise(t)`. Generation includes explicit equilibrium prehistory. Fitting pre-windows the measurements, validates support, and uses the official delay resampler on the exact measured grid. No padding or extrapolation is allowed.
 

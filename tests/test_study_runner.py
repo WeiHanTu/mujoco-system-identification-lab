@@ -364,7 +364,11 @@ def mocked_study(tmp_path, training, study, provenance, monkeypatch):
     args = SimpleNamespace(config="configs/evidence_v1.json", registration="mock_registration.json")
     state = {"worker_calls": [], "cache_calls": [], "evaluations": [],
              "fail_B_physics": False, "fail_delay_accuracy": False}
-    monkeypatch.setattr(runner, "collect_provenance", lambda *args, **kwargs: dict(provenance))
+    def collect(*args, **kwargs):
+        state["provenance_command"] = list(args[3])
+        return dict(provenance)
+
+    monkeypatch.setattr(runner, "collect_provenance", collect)
     monkeypatch.setattr(runner, "snapshot_sources", lambda *args, **kwargs: {"test_fixture": True})
     monkeypatch.setattr(joint_experiment, "check_registration", lambda *args, **kwargs: {"test_fixture": True})
     monkeypatch.setattr(api_check, "check_api", lambda *args, **kwargs: {"test_fixture": True})
@@ -479,6 +483,18 @@ def test_full_matrix_accounts_for_all_82_fits_and_five_seeds(mocked_study):
         if call["cell"] == "C_delay_only":
             assert call["physical"].mass_kg == 1.2 and call["physical"].damping_nm_s_per_rad == .15
             assert call["start"] == {"delay_s": .002}
+
+
+@pytest.mark.parametrize("within_checkout", [False, True])
+def test_study_command_records_the_actual_interpreter(mocked_study, monkeypatch, within_checkout):
+    root, output, args, state = mocked_study
+    executable = root/".venv/bin/python" if within_checkout else root.parent/"external-python/bin/python"
+    # Fake workers keep this a command/provenance regression, with no child
+    # process or scientific optimization launched using the labeled path.
+    monkeypatch.setattr(runner.sys, "executable", str(executable))
+    assert runner.run_study(root, args, output, through=6) == 0
+    assert state["provenance_command"][0] == (".venv/bin/python" if within_checkout else str(executable))
+    assert state["provenance_command"][1] == "scripts/run_experiment.py"
 
 
 @pytest.mark.parametrize("failure,expected_not_run", [("fail_B_physics", 20), ("fail_delay_accuracy", 15)])

@@ -40,7 +40,8 @@ def main() -> int:
               for name in ("audit", "training_audit")}
     if run["status"] != "passed" or any(item.get("verdict", item.get("status")) != "passed" for item in audits.values()):
         parser.error("Verified fit/report and independent audits must pass before curation")
-    executable = Path(sys.executable).absolute().relative_to(ROOT).as_posix()
+    executable_path = Path(sys.executable).absolute()
+    executable = executable_path.relative_to(ROOT).as_posix() if executable_path.is_relative_to(ROOT) else str(executable_path)
     provenance = collect_provenance(ROOT, ROOT / "configs/evidence_v1.json", ROOT / "model/pendulum.xml",
                                     [executable, "scripts/curate_milestone3.py", *sys.argv[1:]])
     provenance.update(seed=101, milestone=3, scenario="matched", created_at_utc=datetime.now(timezone.utc).isoformat(),

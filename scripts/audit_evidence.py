@@ -500,8 +500,10 @@ def main():
     run = safe_path(ROOT, args.run)
     output = safe_path(ROOT, args.output)
     require(output.is_relative_to(ROOT / "artifacts/audits") and not output.exists(), "Choose new ignored audit JSON")
+    executable_path = Path(sys.executable).absolute()
+    executable = executable_path.relative_to(ROOT).as_posix() if executable_path.is_relative_to(ROOT) else str(executable_path)
     provenance = collect_provenance(ROOT, ROOT / "configs/evidence_v1.json", ROOT / "model/pendulum.xml",
-                                    [".venv/bin/python", "scripts/audit_evidence.py", *sys.argv[1:]])
+                                    [executable, "scripts/audit_evidence.py", *sys.argv[1:]])
     if provenance["git"]["dirty"]:
         provenance["source_snapshot"] = snapshot_sources(ROOT, output.parent / f"{output.stem}_source_snapshot")
     audit = audit_run(ROOT, run)

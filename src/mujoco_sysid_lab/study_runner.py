@@ -371,8 +371,10 @@ def run_study(root: Path, args, output: Path, *, through: int = 9) -> int:
     study = load_study_config(root / args.config)
     model_path = root / "model/pendulum.xml"
     registration = check_registration(root / args.config, study.truth_config_path, root / args.registration)
+    executable_path = Path(sys.executable).absolute()
+    executable = executable_path.relative_to(root).as_posix() if executable_path.is_relative_to(root) else str(executable_path)
     provenance = collect_provenance(root, root / args.config, model_path,
-                                    [".venv/bin/python", "scripts/run_experiment.py", *sys.argv[1:]])
+                                    [executable, "scripts/run_experiment.py", *sys.argv[1:]])
     if provenance["mujoco_version"] != "3.15.0" or provenance["python"]["version"] != "3.12.5":
         raise ValueError("Full evidence requires pinned MuJoCo/Python")
     output.mkdir(parents=True, exist_ok=False)

@@ -61,7 +61,7 @@ def main() -> int:
             if sha256_file(ROOT / path) != expected:
                 parser.error("Scientific source changed; report-only cache reuse is invalid")
     executable = Path(sys.executable).absolute()
-    executable_text = executable.relative_to(ROOT).as_posix()
+    executable_text = executable.relative_to(ROOT).as_posix() if executable.is_relative_to(ROOT) else str(executable)
     provenance = collect_provenance(ROOT, config, model,
                                     [executable_text, "scripts/repair_milestone3_reports.py", *sys.argv[1:]])
     if provenance["package_versions"] != original["provenance"]["package_versions"]:

@@ -14,6 +14,7 @@ Planning date: 2026-10-12, America/Los_Angeles.
 - The user approved the plan on 2026-10-12, authorized Milestones 2–4, and on 2026-10-13 explicitly approved all remaining work through Milestone 9. Verify every milestone before advancing, but do not pause for another approval. Scope includes joint recovery, held-out evaluation, delay, all seeds/starts, mismatch, final tests/CI configuration/documentation, and ignored interview notes.
 - After each numbered milestone, verify its gate and report evidence and failures. The user's approval of all remaining milestones supersedes the earlier wait-for-continuation requirement; correctness and scientific prerequisites still apply.
 - The user supplied the existing GitHub repository and authorized connecting it as local origin. No upload, publication, or messages to other people are authorized by the planning request or by supplying the remote alone.
+- On 2026-10-13 the user explicitly authorized auditing public presentation, architecture, APIs, tests, and delivery; fixing concrete gaps; verifying; committing; and pushing this repository. That later instruction authorizes publishing authored source and curated results to the supplied origin. Private notes and ignored raw archives remain excluded; archive upload, hosted deployment, and messages to other people were not requested.
 
 ## Scientific integrity
 

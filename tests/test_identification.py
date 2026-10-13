@@ -51,6 +51,15 @@ def _fixed_nuisance(study, name):
     )
 
 
+def test_build_problem_rejects_slide_joint_before_constructing_estimator(tmp_path, study, training):
+    altered = tmp_path/"unsupported_slide.xml"
+    altered.write_text(MODEL.read_text().replace('type="hinge"', 'type="slide"'))
+    with pytest.raises(ValueError, match="named hinge joint"):
+        build_problem(training, altered, study.nominal, study,
+                      ("mass_kg", "damping_nm_s_per_rad"),
+                      {"mass_kg": .8, "damping_nm_s_per_rad": .04})
+
+
 @pytest.mark.parametrize("name,truth", [("mass_kg", 1.20), ("damping_nm_s_per_rad", 0.15)])
 def test_official_noiseless_single_parameter_recovery_with_fixed_nuisance(study, training, name, truth):
     physical = _fixed_nuisance(study, name)

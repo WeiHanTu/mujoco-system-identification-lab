@@ -57,7 +57,9 @@ def run_milestone4(root: Path, args, output: Path) -> int:
     config, registration_path, model_path = root / args.config, root / args.registration, root / "model/pendulum.xml"
     study = load_study_config(config)
     registration = check_registration(config, study.truth_config_path, registration_path)
-    executable = Path(sys.executable).absolute().relative_to(root).as_posix()
+    executable_path = Path(sys.executable).absolute()
+    executable = (executable_path.relative_to(root).as_posix()
+                  if executable_path.is_relative_to(root) else str(executable_path))
     provenance = collect_provenance(root, config, model_path, [executable, "scripts/run_experiment.py", *sys.argv[1:]])
     if provenance["mujoco_version"] != "3.15.0" or provenance["python"]["version"] != "3.12.5":
         raise ValueError("Restore registered MuJoCo 3.15.0 / Python 3.12.5 environment")

@@ -27,7 +27,7 @@ from mujoco_sysid_lab.dataset import (
     TrainingDataset, TrainingSequence,
 )
 from mujoco_sysid_lab.experiment_config import StudyConfig
-from mujoco_sysid_lab.simulation import load_spec
+from mujoco_sysid_lab.simulation import _validate_model_contract, load_spec
 
 
 PHYSICAL_PARAMETERS = ("mass_kg", "damping_nm_s_per_rad")
@@ -331,8 +331,7 @@ def build_problem(training: TrainingDataset, model_path: Path, physical: ModelCo
                                            if name in PHYSICAL_PARAMETERS})
     spec = load_spec(model_path, starting_physics)
     model = spec.compile()
-    if (model.nq, model.nv, model.na, model.nu, model.nsensordata) != (1, 1, 0, 1, 2):
-        raise ValueError("fit model must implement the one-hinge no-activation sensor contract")
+    _validate_model_contract(model)
     params = sysid.ParameterDict()
     for name in free_parameters:
         bound = bounds[name]

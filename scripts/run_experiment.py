@@ -142,8 +142,10 @@ def main() -> int:
             if status == 0 and args.milestone == 9:
                 phase = "curation"
                 from mujoco_sysid_lab.final_reporting import curate_results
+                executable_path = Path(sys.executable).absolute()
+                executable = executable_path.relative_to(ROOT).as_posix() if executable_path.is_relative_to(ROOT) else str(executable_path)
                 curate_results(ROOT, output / "run.json", output / "curation",
-                               [".venv/bin/python", "scripts/run_experiment.py", *sys.argv[1:]])
+                               [executable, "scripts/run_experiment.py", *sys.argv[1:]])
                 print(f"Public results and figures generated from {output.relative_to(ROOT)}")
             return status
         except (Exception, KeyboardInterrupt) as error:

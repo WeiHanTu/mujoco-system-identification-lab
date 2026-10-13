@@ -1,6 +1,6 @@
-# Repository review after Milestone 9
+# Repository review after Milestone 9 — historical checkpoint
 
-All nine scientific milestones passed before this review. The subsequent work improves presentation, reproducibility, and failure handling while preserving the registered experiment and its retained results.
+All nine scientific milestones passed before this review. This record describes the completed local review before the user's subsequent publication request. The work improves presentation, reproducibility, and failure handling while preserving the registered experiment and its retained results.
 
 The README now leads with held-out prediction, scope, and a short reproduction command. Separate API and development guides explain interfaces, units, timing support, cache reuse, and evidence handling. A compact overview covers all 82 fits and 30 selected seed/scenario groups; a separate baseline table records nominal/oracle parameter errors. The detailed summary, original parameter table, five scientific figures, and official reports retain their original bytes.
 
@@ -30,6 +30,6 @@ The public overview was produced without simulation or optimization from clean c
 
 The subsequent archive is `artifacts/archives/20261013_professional_verified.tar.gz`, 166,899,487 bytes, SHA256 `0f3c822030bbc5a550c631641b7348127dd865b57d18ca7952beb18c0532f783`. All 1,599 regular member sizes and hashes passed verification after reopening. [professional_archive.json](results/professional_archive.json) retains its exact command, complete inventory, cached dependencies, and clean producer commit `0a2b6f0`.
 
-It preserves the original scientific runs and failures, final verification logs, overview producer, package verification, and a verified Git source-history bundle through `0a2b6f0`. The bundle includes the historical source commits needed to reconstruct the retained runs. The later commit publishing this archive inventory is outside the bundle. The original Milestone 9 archive remains unchanged. Archives and source history stay local; no upload or repository publication has occurred.
+It preserves the original scientific runs and failures, final verification logs, overview producer, package verification, and a verified Git source-history bundle through `0a2b6f0`. The bundle includes the historical source commits needed to reconstruct the retained runs. The later commit publishing this archive inventory is outside the bundle. The original Milestone 9 archive remains unchanged. At this checkpoint, archives and source history stayed local; no upload or repository publication had occurred.
 
 This remains synthetic workflow verification. It establishes no real-robot validation, HIL, physical calibration, contact-rich manipulation, real sim-to-real transfer, production deployment, or general parameter identifiability.

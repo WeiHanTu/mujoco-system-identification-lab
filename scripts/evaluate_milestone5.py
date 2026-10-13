@@ -56,7 +56,9 @@ def main() -> int:
     dataset = load_evaluation_dataset(manifest)
     truth = load_ground_truth(study.truth_config_path, study)
     identified = replace(study.nominal, **dict(zip(selection["free_parameter_order"], selection["selected_vector"], strict=True)))
-    provenance = collect_provenance(ROOT, ROOT / args.config, ROOT / "model/pendulum.xml", [".venv/bin/python", "scripts/evaluate_milestone5.py", *sys.argv[1:]])
+    executable_path = Path(sys.executable).absolute()
+    executable = executable_path.relative_to(ROOT).as_posix() if executable_path.is_relative_to(ROOT) else str(executable_path)
+    provenance = collect_provenance(ROOT, ROOT / args.config, ROOT / "model/pendulum.xml", [executable, "scripts/evaluate_milestone5.py", *sys.argv[1:]])
     provenance.update(seed=dataset.seed, milestone=5, selected_fit_id=selection["selected_fit_id"])
     output.mkdir(parents=True, exist_ok=False)
     if provenance["git"]["dirty"]:
