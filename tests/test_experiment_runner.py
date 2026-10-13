@@ -48,11 +48,42 @@ def test_runner_refuses_existing_output_without_touching_evidence():
         assert len(list(Path(existing).iterdir())) == 1
 
 
-def test_runner_rejects_unauthorized_milestone_five_before_importing_or_fitting():
+def test_evaluation_only_milestone_five_has_a_dedicated_command():
     result = subprocess.run([sys.executable, "scripts/run_experiment.py", "--milestone", "5"],
                             cwd=ROOT, capture_output=True, text=True)
     assert result.returncode == 2 and "invalid choice" in result.stderr
     assert "Traceback" not in result.stderr
+
+
+@pytest.mark.parametrize("fit_status", [0, 1])
+def test_full_command_curates_only_after_completed_fitting(monkeypatch, fit_status):
+    from mujoco_sysid_lab import study_runner, final_reporting
+    (ROOT / "artifacts").mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=ROOT / "artifacts") as temporary:
+        output = Path(temporary) / "new_run"
+        events = []
+
+        def fitted(root, args, target, *, through):
+            assert through == 9
+            assert target == output
+            target.mkdir()
+            (target / "run.json").write_text('{"labeled_mock":true}')
+            events.append("fitting_complete" if fit_status == 0 else "fitting_incomplete")
+            return fit_status
+
+        def curated(root, source, target, command):
+            assert events == ["fitting_complete"]
+            assert source == output / "run.json" and source.is_file()
+            assert target == output / "curation"
+            assert command[1] == "scripts/run_experiment.py"
+            events.append("public_curation")
+            return {"status": "passed"}
+
+        monkeypatch.setattr(study_runner, "run_study", fitted)
+        monkeypatch.setattr(final_reporting, "curate_results", curated)
+        monkeypatch.setattr(sys, "argv", ["scripts/run_experiment.py", "--milestone", "9", "--output", str(output)])
+        assert runner.main() == fit_status
+        assert events == (["fitting_complete", "public_curation"] if fit_status == 0 else ["fitting_incomplete"])
 
 
 def test_noiseless_harness_simulates_only_training_controls_and_preserves_measured_inputs():
