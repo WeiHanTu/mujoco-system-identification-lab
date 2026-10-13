@@ -20,6 +20,22 @@ for variable in (
     os.environ[variable] = "1"
 os.environ["MPLBACKEND"] = "Agg"
 os.environ["MPLCONFIGDIR"] = str(ROOT / "artifacts" / "matplotlib")
+os.environ["XDG_CACHE_HOME"] = str(ROOT / "artifacts" / "cache")
+
+
+def _setup_records(root: Path) -> list[dict]:
+    """Hash completed setup inputs, never the runner's active console output."""
+    from mujoco_sysid_lab.provenance import sha256_file
+
+    names = (
+        "commands.json", "uv-lock.log", "uv-sync.log",
+        "pytest-milestone1.log", "pytest-milestone1-final.log",
+    )
+    paths = [root / "artifacts" / "setup" / name for name in names]
+    return [
+        {"path": path.relative_to(root).as_posix(), "sha256": sha256_file(path)}
+        for path in paths if path.is_file()
+    ]
 
 
 def _output_directory(argument: str | None) -> Path:
@@ -74,12 +90,12 @@ def main() -> int:
         "identification_performed": False,
         "measurement_noise": {"enabled": False},
         "randomness_used": False,
+        "runtime_environment": {
+            "MPLBACKEND": "Agg", "MPLCONFIGDIR": "artifacts/matplotlib",
+            "XDG_CACHE_HOME": "artifacts/cache",
+        },
     })
-    record["setup_records"] = [
-        {"path": path.relative_to(ROOT).as_posix(), "sha256": sha256_file(path)}
-        for path in sorted((ROOT / "artifacts" / "setup").glob("*"))
-        if path.is_file()
-    ]
+    record["setup_records"] = _setup_records(ROOT)
     if record["git"]["dirty"]:
         record["source_snapshot"] = snapshot_sources(ROOT, output / "source_snapshot")
     write_json(output / "run.json", record)
