@@ -1,7 +1,7 @@
 # Intent and claim boundaries
 
 Project: `mujoco-system-identification-lab`.
-Status: Milestones 1–8 are verified. All registered synthetic recovery, held-out prediction, delay, five-seed/three-start, and mismatch experiments are retained. Milestone 9 final curation/audit is in progress; remote CI and real hardware remain unverified.
+Status: Milestones 1–8 are verified. All registered synthetic recovery, held-out prediction, delay, five-seed/three-start, and mismatch experiments are retained. Milestone 9 final curation/audit passed; remote CI and real hardware remain unverified.
 
 ## Intended result
 
