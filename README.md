@@ -12,6 +12,14 @@ The authored model is a single actuated hinge with a uniform rigid link. Ground-
 
 ## Reproduce Milestone 1
 
+With the existing locked environment, run from the repository root:
+
+```sh
+.venv/bin/python scripts/verify_milestone1.py --config configs/milestone1.json
+```
+
+Leave `--output` unset for repeat runs. Each invocation creates a fresh UTC-timestamped directory under `artifacts/milestone1/`. An explicit output directory must be new; the runner refuses to overwrite retained evidence. The dated explicit-output command in the milestone record documents a historical run and is not a rerun command.
+
 Python 3.12.5 is the recorded interpreter. Direct dependencies and every resolved runtime dependency are pinned in pyproject.toml and uv.lock. The project has no dependency on MuJoCo Git main.
 
 ```sh

@@ -4,7 +4,7 @@ Status: user approved v0.1 on 2026-10-12; Milestone 1 installed-API verification
 
 ## Environment and dependencies
 
-Inspection on 2026-10-12, America/Los_Angeles:
+Initial planning inspection on 2026-10-12, America/Los_Angeles (before the Milestone 1 installation):
 
 - Workspace was empty; no on-disk ancestor/workspace `AGENTS.md` was found. The user supplied the directness instruction in chat.
 - macOS 26.6.2, Darwin 25.6.0, ARM64; Apple M4 Pro, 12 CPU cores (8 performance, 4 efficiency), 24 GB memory.
@@ -26,7 +26,7 @@ Proposed exact direct pins:
 
 These supporting versions are conservative released pins, not claims that they are the newest. PyPI release pages were checked. Milestone 1 resolved and installed 36 locked packages; required imports and deterministic residual/simulation contracts pass. Optimization and official HTML generation remain later milestones. Use JSON configs and stdlib parsing; no additional configuration framework. Committed uv.lock covers transitive runtime SysID extras and wheel hashes; setuptools==80.9.0 is pinned in build-system requirements. A future resolver conflict must be reported rather than silently changing pins.
 
-Official release metadata confirms the `sysid` extra and report template packaging. Read-only inspection of the released CPython 3.12 macOS ARM64 wheel confirmed required export declarations and important sources matching tag 3.15.0. The wheel SHA256 matched PyPI: `18d1b33660c6431ef05398fc576ff1e073ea4119c6e6836f8a113e393d915308`. No package code was imported or installed. Installed import/signature verification is still required:
+Official release metadata confirms the `sysid` extra and report template packaging. Planning-stage read-only inspection of the released CPython 3.12 macOS ARM64 wheel confirmed required export declarations and important sources matching tag 3.15.0. The wheel SHA256 matched PyPI: `18d1b33660c6431ef05398fc576ff1e073ea4119c6e6836f8a113e393d915308`. That inspection did not import/install code; subsequent Milestone 1 installation verified the actual imports/signatures and contracts below:
 
 - `Parameter`, `ParameterDict`, `TimeSeries`, `create_initial_state`, `ModelSequences`, `build_residual_fn`, `optimize`, `save_results`, and `default_report` must be present and callable.
 - Import alone is insufficient: the release initializer can catch a missing optional dependency and leave exports unavailable.
@@ -34,7 +34,7 @@ Official release metadata confirms the `sysid` extra and report template packagi
 - A frozen-parameter example/docstring disagrees with the modifier path, which skips frozen physical modifiers. Stamp fixed physical values into the spec and omit them from free physical parameters.
 - The default residual includes signal-amplitude normalization. Installed 3.15.0 code actually divides by per-sensor L2 norm / sqrt(2), despite a docstring describing standard deviation. Disable it and explicitly apply known-noise weighting; otherwise the intended objective changes.
 - The mass helper defaults to not scaling rotational inertia. Set consistent mass/inertia behavior explicitly and verify the compiled model.
-- Tagged delay-window code appears to warrant a sign/boundary check. This is a source-inspection concern, not a runtime-confirmed defect. Pre-window observations safely and verify actual installed behavior before using it.
+- The installed positive-delay window probe reproduces 30 unsupported leading samples at maximum registered delay if data is not pre-windowed. The fixed safe pre-window is tested before delay identification.
 - Installed runtime probes confirm a separate one-timestep sensor/state labeling offset for this jointpos/jointvel pair: official rollout sensors precede integration, but SysID arrays2traj labels them with post-step state times. Use the supported modify_residual hook to reconstruct these exact two sensors from FULLPHYSICS post-step states, prepend the explicit initial observation, and validate against direct fresh-sensor simulation. This narrow adapter is limited to nq=nv=1, na=0, and the named jointpos/jointvel sensor layout. Never silently fit the offset as measurement delay.
 - Rollout accumulates floating-point time whereas the data grid uses arange*dt. Verify state times against that grid with arithmetic tolerance `1e-12 + 8*float64_eps*nsteps*max(1,horizon_s)`, then use canonical grid labels for the fresh observations. The eight-second timing test observed 6.59e-13 s clock accumulation error and preserved both fixed-window boundary samples. This arithmetic correction does not alter the 0.002 s scientific delay-recovery threshold.
 - Native `optimizer="mujoco"` does not provide success/status/iteration/evaluation fields. Use the official toolbox's `scipy_parallel_fd` backend for richer diagnostics; do not fabricate unavailable fields or write a separate optimizer.

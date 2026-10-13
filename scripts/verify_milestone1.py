@@ -47,7 +47,11 @@ def _output_directory(argument: str | None) -> Path:
     if not result.is_relative_to(ROOT / "artifacts"):
         raise ValueError("Milestone output must be under the ignored artifacts/ directory")
     if result.exists():
-        raise ValueError("Output already exists; choose a new run directory to preserve evidence")
+        raise ValueError(
+            f"Output directory already exists: {result.relative_to(ROOT)}. "
+            "Omit --output to create a new timestamped run directory, "
+            "or choose a different --output path. Existing evidence is never overwritten."
+        )
     return result
 
 
@@ -57,6 +61,10 @@ def main() -> int:
     parser.add_argument("--config", default="configs/milestone1.json")
     parser.add_argument("--output", help="New ignored artifact directory (default: UTC run ID)")
     args = parser.parse_args()
+    try:
+        output = _output_directory(args.output)
+    except ValueError as error:
+        parser.error(str(error))
 
     import numpy as np
 
@@ -70,7 +78,6 @@ def main() -> int:
     config_path = (ROOT / args.config).resolve()
     model_path = ROOT / "model" / "pendulum.xml"
     config = load_config(config_path)
-    output = _output_directory(args.output)
     executable = Path(sys.executable).absolute()
     executable_text = (
         executable.relative_to(ROOT).as_posix()

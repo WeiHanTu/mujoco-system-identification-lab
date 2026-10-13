@@ -2,6 +2,16 @@
 
 Verified locally on 2026-10-12, America/Los_Angeles. This checkpoint covers environment, API contracts, and deterministic synthetic simulation. It does not cover identification, held-out prediction, or real hardware.
 
+## Rerun verification
+
+Run from the repository root with the existing locked environment:
+
+```sh
+.venv/bin/python scripts/verify_milestone1.py --config configs/milestone1.json
+```
+
+Leaving `--output` unset creates a fresh UTC-timestamped directory under `artifacts/milestone1/`. Explicit output directories must be new; an existing directory is rejected to preserve its evidence.
+
 ## Evidence
 
 - Source commit: `4ad8657763b7568e1f16d92d3a3808cb739488c9`; clean at run start.
@@ -12,7 +22,7 @@ Verified locally on 2026-10-12, America/Los_Angeles. This checkpoint covers envi
 - Warm-cache full verification: 0.6805 s. Two one-second rollouts: 0.001816 and 0.001733 s. Full-study runtime remains unknown.
 - Local tests: 86 passed in 1.60 s, with 16 upstream NumPy/Pyparsing deprecation warnings visible. Warnings were not suppressed; remote CI has not run.
 
-Exact retained-run command:
+Historical retained-run command (audit reference only; its output directory already exists and cannot be reused):
 
 ```sh
 .venv/bin/python scripts/verify_milestone1.py --config configs/milestone1.json --output artifacts/milestone1/20261012_seed101_verified

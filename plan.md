@@ -4,7 +4,7 @@ Status: plan approved on 2026-10-12; Milestone 1 is complete and verified. Stop 
 
 ## Current checkpoint
 
-Workspace and available instructions inspected. Four requested planning files created in an independent project directory. Released MuJoCo 3.15.0 metadata and tagged SysID source inspected; installed API/import execution remains pending because MuJoCo is absent. No datasets, optimizations, result images, or success claims have been produced.
+Workspace and available instructions inspected. Four requested planning files created in an independent project directory. Milestone 1 installed MuJoCo 3.15.0, verified official SysID imports/contracts, and retained an audited deterministic simulation. Training/held-out datasets and identification have not started.
 
 The user supplied `https://github.com/WeiHanTu/mujoco-system-identification-lab.git`. A read-only Git check found no advertised branches or tags; the existing local repository is connected to it as origin. The user subsequently approved the plan and authorized Milestone 1. No remote publication has been requested.
 
