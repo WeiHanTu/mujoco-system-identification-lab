@@ -12,7 +12,9 @@ from scipy.optimize import OptimizeResult
 
 from mujoco_sysid_lab.dataset import TrainingDataset, TrainingSequence
 from mujoco_sysid_lab.experiment_config import load_ground_truth, load_study_config
-from mujoco_sysid_lab.fit_reporting import _verify_serialized_model, save_official_fit, summarize_fit
+from mujoco_sysid_lab.fit_reporting import (
+    _verify_serialized_model, save_official_fit, summarize_fit, summarize_optimization,
+)
 from mujoco_sysid_lab.identification import build_problem
 from mujoco_sysid_lab.provenance import sha256_file
 from mujoco_sysid_lab.simulation import compile_model, simulate
@@ -274,3 +276,95 @@ def test_official_saver_preserves_full_precision_for_non_six_digit_candidate(tmp
     assert fields["body_mass"]["maximum_relative_serialization_error"] == abs(exact_mass-1.1999)/exact_mass
     assert info["parameter_precision"]["scientific_thresholds_changed"] is False
     assert "pendulum.mjb" in info["parameter_precision"]["full_precision_files"]
+
+
+def test_optimization_summary_has_no_physical_truth_or_recovery_errors():
+    problem, execution = diagnostic_fixture()
+    diagnostic = summarize_optimization(problem, execution)
+    assert diagnostic["physical_truth_evaluated"] is False
+    assert diagnostic["schema_version"] == "mujoco-sysid-lab.optimization-summary.v1"
+    for row in diagnostic["parameter_rows"]:
+        assert not {"truth", "absolute_error", "relative_error", "error_reference"} & set(row)
+    evaluated = summarize_fit(problem, execution, {"mass_kg": 1.2})
+    assert "physical_truth_evaluated" not in evaluated
+    for key in ("objective", "optimizer", "call_counts", "objective_trace", "runtime_seconds", "sensitivity", "confidence_intervals"):
+        assert diagnostic[key] == evaluated[key]
+    assert evaluated["parameter_rows"][0]["truth"] == 1.2
+    json.dumps(diagnostic, allow_nan=False)
+
+
+def test_invalid_fit_scope_rejects_before_creating_output(tmp_path):
+    output = tmp_path / "invalid"
+    with pytest.raises(ValueError, match="fit_scope"):
+        save_official_fit(output, None, None, fit_scope="real_robot")
+    assert not output.exists()
+
+
+@pytest.fixture(scope="module")
+def reduced_joint_fit():
+    """Two-second noisy joint test, separate from registered B evidence."""
+    study = load_study_config(ROOT / "configs/evidence_v1.json")
+    truth = load_ground_truth(study.truth_config_path, study)
+    generator_model = compile_model(ROOT / "model/pendulum.xml", truth.model)
+    times = np.arange(1001) * study.timestep_s
+    sequences = []
+    for identity, name in enumerate(("train_multisine", "train_prbs")):
+        controls = (0.6 * np.sin(2*np.pi*(0.7+identity*0.5)*times))[:, None]
+        controls[times < study.zero_control_prefix_s] = 0
+        clean = simulate(generator_model, times, controls)
+        noisy = []
+        for sensor_id, (sensor, sigma) in enumerate(((clean.qpos, 0.002), (clean.qvel, 0.020))):
+            rng = np.random.Generator(np.random.PCG64(np.random.SeedSequence([101, 99, identity, sensor_id])))
+            noisy.append(sensor + sigma * rng.standard_normal(sensor.shape))
+        sequences.append(TrainingSequence(name, identity, times, controls, *noisy, np.array([0., 0., 0.])))
+    training = TrainingDataset(101, tuple(sequences))
+    # Only nominal physics goes to the fit builder; truth is generator-only.
+    problem = build_problem(training, ROOT / "model/pendulum.xml", study.nominal, study,
+                            ("mass_kg", "damping_nm_s_per_rad"),
+                            {"mass_kg": 0.8, "damping_nm_s_per_rad": 0.04})
+    execution = problem.run()
+    return problem, execution
+
+
+def test_reduced_joint_optimization_summary_has_two_dimensional_local_diagnostics(reduced_joint_fit):
+    problem, execution = reduced_joint_fit
+    summary = summarize_optimization(problem, execution)
+    assert len(summary["parameter_rows"]) == 2
+    assert {row["name"] for row in summary["parameter_rows"]} == {"mass_kg", "damping_nm_s_per_rad"}
+    assert summary["sensitivity"]["rank"] == 2
+    assert len(summary["sensitivity"]["singular_values"]) == 2
+    assert np.isfinite(summary["sensitivity"]["condition_number"])
+    assert summary["confidence_intervals"]["status"] == "available"
+    assert np.asarray(summary["confidence_intervals"]["covariance"]).shape == (2, 2)
+    assert np.asarray(summary["confidence_intervals"]["intervals"]).shape == (2, 2)
+    evaluated = summarize_fit(problem, execution, {"mass_kg": 1.2, "damping_nm_s_per_rad": 0.15})
+    assert all(row["relative_error"] <= 0.1 for row in evaluated["parameter_rows"])
+    json.dumps(summary, allow_nan=False)
+
+
+def test_reduced_joint_official_html_and_binary_use_both_fitted_parameters(tmp_path, reduced_joint_fit):
+    problem, execution = reduced_joint_fit
+    before = problem.spec.to_xml()
+    saved_counts = deepcopy(execution.call_counts)
+    output = tmp_path / "joint_official"
+    info = save_official_fit(output, problem, execution, title="Reduced synthetic joint test",
+                             fit_scope="joint_physical")
+    assert info["original_spec_unchanged"] and problem.spec.to_xml() == before
+    assert execution.call_counts == saved_counts
+    assert info["reporting_call_counts"]["residual_calls"] == 3
+    html = (output / "report.html").read_text()
+    assert "mass and damping are jointly estimated" in html
+    assert "no physical truth is supplied to optimization or start selection" in html
+    assert "oracle-assisted single-parameter study" not in html
+    binary = mujoco.MjModel.from_binary_path(str(output / "pendulum.mjb"))
+    fitted_mass = float(execution.optimized_params["mass_kg"].value[0])
+    fitted_damping = float(execution.optimized_params["damping_nm_s_per_rad"].value[0])
+    assert binary.body_mass[1] == fitted_mass
+    assert binary.dof_damping[0] == fitted_damping
+    original = problem.spec.compile()
+    np.testing.assert_allclose(binary.body_inertia[1] / fitted_mass,
+                               original.body_inertia[1] / original.body_mass[1], rtol=1e-14)
+    saved = mujoco.MjModel.from_xml_path(str(output / "pendulum.xml"))
+    assert saved.body_mass[1] == float(format(fitted_mass, ".6g"))
+    assert saved.dof_damping[0] == float(format(fitted_damping, ".6g"))
+    json.dumps(info, allow_nan=False)

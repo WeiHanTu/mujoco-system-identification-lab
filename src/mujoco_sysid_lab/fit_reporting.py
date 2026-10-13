@@ -140,9 +140,14 @@ def _intervals(residual: np.ndarray, jacobian: Any, sensitivity: dict,
             "intervals": np.column_stack((estimates - half_widths, estimates + half_widths)).tolist()}
 
 
-def summarize_fit(problem: Any, execution: Any, truth_values: Mapping[str, float], *,
-                  noiseless: bool = False, bound_hit_fraction: float = 0.001) -> dict:
-    """Summarize one retained fit; truth is evaluation-only and never refitted."""
+def summarize_optimization(problem: Any, execution: Any, *, noiseless: bool = False,
+                           bound_hit_fraction: float = 0.001) -> dict:
+    """Summarize optimization and sensitivity without receiving physical truth.
+
+    This is safe before training-objective start selection. Parameter rows
+    contain estimates, starts, and bounds, with no physical recovery errors.
+    Local intervals depend on the residual/Jacobian, not a truth reference.
+    """
     fraction = _number(bound_hit_fraction, "bound_hit_fraction")
     if not 0 <= fraction < 0.5:
         raise ValueError("bound_hit_fraction must lie in [0,0.5)")
@@ -164,20 +169,14 @@ def summarize_fit(problem: Any, execution: Any, truth_values: Mapping[str, float
         raise ValueError("free parameter bounds/vectors are inconsistent or infeasible")
     rows = []
     for index, name in enumerate(names):
-        truth = _number(truth_values[name], f"truth_values.{name}") if name in truth_values else None
-        if truth is None:
-            raise ValueError(f"missing evaluation truth for {name}")
-        absolute = abs(float(estimates[index]) - truth)
         lo_hit = bool(estimates[index] - lower[index] <= fraction * (upper[index] - lower[index]))
         hi_hit = bool(upper[index] - estimates[index] <= fraction * (upper[index] - lower[index]))
         rows.append({
             "name": name, "unit": UNITS.get(name, "unspecified"),
             "initial": float(initial[index]), "estimate": float(estimates[index]),
-            "truth": truth, "lower_bound": float(lower[index]), "upper_bound": float(upper[index]),
-            "absolute_error": absolute, "relative_error": absolute / abs(truth) if truth != 0 else None,
-            "relative_error_reason": None if truth != 0 else "Relative error is undefined for zero truth.",
+            "lower_bound": float(lower[index]), "upper_bound": float(upper[index]),
             "bound_hit": lo_hit or hi_hit, "lower_bound_hit": lo_hit, "upper_bound_hit": hi_hit,
-            "bound_hit_fraction": fraction, "error_reference": "evaluation-only hidden physical truth",
+            "bound_hit_fraction": fraction,
         })
     result = execution.optimize_result
     diagnostics, unavailable = {}, {}
@@ -199,7 +198,8 @@ def summarize_fit(problem: Any, execution: Any, truth_values: Mapping[str, float
     if runtime < 0:
         raise ValueError("runtime_seconds must be nonnegative")
     summary = {
-        "schema_version": "mujoco-sysid-lab.fit-summary.v1",
+        "schema_version": "mujoco-sysid-lab.optimization-summary.v1",
+        "physical_truth_evaluated": False,
         "parameter_rows": rows,
         "objective": {"initial": initial_objective, "final": final_objective,
                       "definition": "0.5*sum(noise_normalized_residual**2)",
@@ -220,6 +220,33 @@ def summarize_fit(problem: Any, execution: Any, truth_values: Mapping[str, float
                                            converged=diagnostics["success"]),
         "noiseless": bool(noiseless),
     }
+    json.dumps(summary, allow_nan=False)
+    return summary
+
+
+def summarize_fit(problem: Any, execution: Any, truth_values: Mapping[str, float], *,
+                  noiseless: bool = False, bound_hit_fraction: float = 0.001) -> dict:
+    """Add physical truth errors only after optimization/start selection.
+
+    The existing single-parameter summary schema/semantics are preserved.
+    Evaluation truth is read solely here and never affects optimizer choices.
+    """
+    summary = summarize_optimization(problem, execution, noiseless=noiseless,
+                                     bound_hit_fraction=bound_hit_fraction)
+    summary["schema_version"] = "mujoco-sysid-lab.fit-summary.v1"
+    summary.pop("physical_truth_evaluated")
+    for row in summary["parameter_rows"]:
+        name = row["name"]
+        if name not in truth_values:
+            raise ValueError(f"missing evaluation truth for {name}")
+        truth = _number(truth_values[name], f"truth_values.{name}")
+        absolute = abs(row["estimate"] - truth)
+        row.update({
+            "truth": truth, "absolute_error": absolute,
+            "relative_error": absolute / abs(truth) if truth != 0 else None,
+            "relative_error_reason": None if truth != 0 else "Relative error is undefined for zero truth.",
+            "error_reference": "evaluation-only hidden physical truth",
+        })
     json.dumps(summary, allow_nan=False)
     return summary
 
@@ -269,7 +296,8 @@ def _verify_serialized_model(saved: mujoco.MjModel, expected: mujoco.MjModel) ->
 
 
 def save_official_fit(directory: Path, problem: Any, execution: Any, *,
-                      title: str = "Synthetic oracle-assisted SysID", noiseless: bool = False) -> dict:
+                      title: str = "Synthetic oracle-assisted SysID", noiseless: bool = False,
+                      fit_scope: str = "oracle_assisted_single_parameter") -> dict:
     """Save official raw results, correctly stamped XML, and official HTML.
 
     The registered problem spec and captured optimization counts are preserved.
@@ -278,6 +306,13 @@ def save_official_fit(directory: Path, problem: Any, execution: Any, *,
     """
     from mujoco.sysid.report.sections.row import RowSection
 
+    if fit_scope not in ("oracle_assisted_single_parameter", "joint_physical"):
+        raise ValueError("fit_scope must be oracle_assisted_single_parameter or joint_physical")
+    scope_note = (
+        "Synthetic oracle-assisted single-parameter study; no real robot, HIL, or sim-to-real validation. "
+        if fit_scope == "oracle_assisted_single_parameter" else
+        "Synthetic joint physical parameter study: mass and damping are jointly estimated from training observations; no physical truth is supplied to optimization or start selection. No real robot, HIL, or sim-to-real validation. "
+    )
     output = Path(directory)
     if output.exists():
         raise ValueError("Output already exists; choose a new run directory to preserve evidence")
@@ -327,8 +362,8 @@ def save_official_fit(directory: Path, problem: Any, execution: Any, *,
         title="Project interpretation and claim boundaries", sections=[],
         anchor="project-interpretation", collapsible=False,
         description=(
-            "Synthetic oracle-assisted single-parameter study; no real robot, HIL, or sim-to-real validation. "
-            "The official observation legend 'nominal' means measured signals, while this project's nominal model means biased physics. "
+            scope_note
+            + "The official observation legend 'nominal' means measured signals, while this project's nominal model means biased physics. "
             "The official parameter error table compares against the starting reference, not hidden ground truth. "
             "Project fit summary truth errors and bound hits (0.001 times bound width) are authoritative; upstream bound styling uses a different rule. "
             "Optimization trace entries include initial, callback, and final evaluations; the upstream Iteration label does not establish an iteration count. "

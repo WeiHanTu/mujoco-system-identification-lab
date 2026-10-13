@@ -48,8 +48,8 @@ def test_runner_refuses_existing_output_without_touching_evidence():
         assert len(list(Path(existing).iterdir())) == 1
 
 
-def test_runner_rejects_unauthorized_milestone_four_before_importing_or_fitting():
-    result = subprocess.run([sys.executable, "scripts/run_experiment.py", "--milestone", "4"],
+def test_runner_rejects_unauthorized_milestone_five_before_importing_or_fitting():
+    result = subprocess.run([sys.executable, "scripts/run_experiment.py", "--milestone", "5"],
                             cwd=ROOT, capture_output=True, text=True)
     assert result.returncode == 2 and "invalid choice" in result.stderr
     assert "Traceback" not in result.stderr

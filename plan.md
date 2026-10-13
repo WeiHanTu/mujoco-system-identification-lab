@@ -1,6 +1,6 @@
 # Execution plan
 
-Status: Milestones 1–3 are complete and verified. Stop before Milestone 4.
+Status: Milestones 1–3 are verified; Milestones 4–9 are authorized. Verify each gate and continue through completion without another approval pause.
 
 ## Current checkpoint
 
@@ -8,7 +8,7 @@ Workspace and available instructions inspected. Four requested planning files cr
 
 The user supplied `https://github.com/WeiHanTu/mujoco-system-identification-lab.git`. A read-only Git check found no advertised branches or tags; the existing local repository is connected to it as origin. The user subsequently approved the plan and authorized Milestone 1. No remote publication has been requested.
 
-The proposed dependencies, experiment matrix, acceptance targets, and claim boundaries were shown before approval. Milestone 1 verified released imports/API contracts, deterministic CPU simulation, and provenance. Its local suite passed 86 tests, with upstream warnings retained. See docs/milestones/01_environment.md and docs/results/milestone1.json. The user authorized Milestone 3 with "Approve next". The frozen configuration remains unchanged; stop before Milestone 4 joint recovery.
+The proposed dependencies, experiment matrix, acceptance targets, and claim boundaries were shown before approval. Milestone 1 verified released imports/API contracts, deterministic CPU simulation, and provenance. Its local suite passed 86 tests, with upstream warnings retained. See docs/milestones/01_environment.md and docs/results/milestone1.json. The user authorized Milestone 4 with "continue". The frozen configuration remains unchanged; stop before Milestone 5 held-out evaluation.
 
 ## Milestone gates
 

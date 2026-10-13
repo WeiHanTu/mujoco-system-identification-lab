@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the authorized Milestone 3 oracle-assisted single-parameter checks."""
+"""Run an authorized synthetic SysID milestone with immutable evidence."""
 from __future__ import annotations
 
 import argparse
@@ -79,18 +79,24 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default="configs/evidence_v1.json")
     parser.add_argument("--registration", default="docs/results/registration_v1.json")
-    parser.add_argument("--milestone", type=int, choices=[3], default=3)
+    parser.add_argument("--milestone", type=int, choices=[3, 4], default=3)
     parser.add_argument("--dataset", help="Existing matched seed-101 dataset manifest or directory")
     parser.add_argument("--output", help="New ignored directory; omit for a UTC-timestamped run")
     args = parser.parse_args()
     config_path = (ROOT / args.config).resolve()
     registration_path = (ROOT / args.registration).resolve()
     model_path = ROOT / "model/pendulum.xml"
-    output = (ROOT / (args.output or ("artifacts/milestone3/" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")))).resolve()
+    output = (ROOT / (args.output or (f"artifacts/milestone{args.milestone}/" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")))).resolve()
     if not output.is_relative_to(ROOT / "artifacts"):
         parser.error("Output must be under ignored artifacts/")
     if output.exists():
         parser.error("Output already exists. Omit --output for a fresh run; existing evidence is never overwritten.")
+    if args.milestone == 4:
+        from mujoco_sysid_lab.joint_experiment import run_milestone4
+        try:
+            return run_milestone4(ROOT, args, output)
+        except (ValueError, OSError, KeyError) as error:
+            parser.error(str(error))
 
     import numpy as np
     from mujoco_sysid_lab.dataset import array_sha256, load_training_sequences

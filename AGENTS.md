@@ -2,7 +2,7 @@
 
 Project: `mujoco-system-identification-lab`.
 Remote supplied by the user: `https://github.com/WeiHanTu/mujoco-system-identification-lab.git` (local origin).
-Status: Milestone 3 complete and verified; stop before Milestone 4 until continuation.
+Status: Milestones 4–9 authorized; verify each checkpoint and continue through project completion.
 Planning date: 2026-10-12, America/Los_Angeles.
 
 ## Working style and authorization
@@ -10,8 +10,8 @@ Planning date: 2026-10-12, America/Los_Angeles.
 - Be direct and ruthless. Do not sugarcoat problems or agree for the sake of it.
 - Read this file, `intend.md`, `spec.md`, and `plan.md` before making changes.
 - This is an independent project under `/Users/weihantu/mujoco-lab/mujoco-system-identification-lab`. Never add its implementation to `sensor-fusion-replay-cpp`.
-- The user approved the plan on 2026-10-12, authorized Milestone 2 with "next", and then authorized Milestone 3 with "Approve next". Current work covers the official SysID fitting/report path, noiseless single-parameter sanity checks, and the registered seed-101 A1/A2 fits. Stop before joint recovery in Milestone 4.
-- After each numbered milestone, stop, verify the stated gate, report evidence and failures, and wait for continuation unless the user explicitly authorizes several milestones together. This checkpoint rule comes from the user's execution-order instruction.
+- The user approved the plan on 2026-10-12, authorized Milestones 2–4, and on 2026-10-13 explicitly approved all remaining work through Milestone 9. Verify every milestone before advancing, but do not pause for another approval. Scope includes joint recovery, held-out evaluation, delay, all seeds/starts, mismatch, final tests/CI configuration/documentation, and ignored interview notes.
+- After each numbered milestone, verify its gate and report evidence and failures. The user's approval of all remaining milestones supersedes the earlier wait-for-continuation requirement; correctness and scientific prerequisites still apply.
 - The user supplied the existing GitHub repository and authorized connecting it as local origin. No upload, publication, or messages to other people are authorized by the planning request or by supplying the remote alone.
 
 ## Scientific integrity
