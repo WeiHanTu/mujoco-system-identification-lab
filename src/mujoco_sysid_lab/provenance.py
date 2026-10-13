@@ -20,7 +20,7 @@ _EXCLUDED_PARTS = frozenset(
 _SOURCE_SUFFIXES = frozenset(
     {".py", ".xml", ".json", ".toml", ".lock", ".md", ".yaml", ".yml", ".sh", ".txt"}
 )
-_SOURCE_DOTFILES = frozenset({".gitignore", ".gitattributes", ".python-version"})
+_SOURCE_DOTFILES = frozenset({".gitignore", ".gitattributes", ".python-version", ".editorconfig"})
 _THREAD_VARIABLES = (
     "OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
     "VECLIB_MAXIMUM_THREADS", "NUMEXPR_NUM_THREADS",

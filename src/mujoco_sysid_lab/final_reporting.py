@@ -495,6 +495,9 @@ def curate_results(root: Path, run_path: Path, output: Path, command: list[str])
         if sha256_file(source) != sha256_file(target):
             raise ValueError("Public artifact copy differs from retained rendering")
         public[target.relative_to(root).as_posix()] = {"sha256": sha256_file(target), "source": source.relative_to(root).as_posix()}
+    from mujoco_sysid_lab.overview_reporting import generate_overview
+    overview_record = generate_overview(root, root/"docs/results/summary.json", output/"overview", command)
+    public.update(overview_record["public_artifacts"])
     result = {"schema_version": "mujoco-sysid-lab.final-curation.v1", "status": "passed",
               "provenance": provenance, "source_run": summary["source_run"],
               "public_artifacts": public, "no_optimization_performed": True,

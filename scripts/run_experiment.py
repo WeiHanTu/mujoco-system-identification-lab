@@ -74,6 +74,28 @@ def training_metrics(training, physical, model_path: Path, study) -> dict:
     return aggregate_metrics(rows)
 
 
+def record_orchestration_failure(output: Path, error: BaseException, *, phase: str) -> None:
+    """Preserve progress and traceback; never touch a colliding run directory."""
+    if not output.is_dir() or isinstance(error, FileExistsError):
+        return
+    from mujoco_sysid_lab.provenance import write_json
+    path = output / "run.json"
+    record = json.loads(path.read_text()) if path.is_file() else {"fits": [], "groups": [], "datasets": {}}
+    if "provenance" not in record and (output / "provenance.json").is_file():
+        record["provenance"] = json.loads((output / "provenance.json").read_text())
+    state = "interrupted" if isinstance(error, KeyboardInterrupt) else "failed"
+    failure = {"type": type(error).__name__, "message": str(error) or state,
+               "phase": phase, "evidence_preserved": True, "status": state,
+               "provenance": record.get("provenance"), "progress": record.get("progress")}
+    trace = output / "orchestration_failure.txt"
+    trace.write_text(traceback.format_exc())
+    failure["traceback_path"] = trace.name
+    write_json(output / "orchestration_failure.json", failure)
+    record.update(execution_status_before_failure=record.get("status"), status=state,
+                  orchestration_failure=failure)
+    write_json(path, record)
+
+
 def main() -> int:
     started = perf_counter()
     parser = argparse.ArgumentParser(description=__doc__)
@@ -82,7 +104,16 @@ def main() -> int:
     parser.add_argument("--milestone", type=int, choices=[3, 4, 6, 7, 8, 9], default=9)
     parser.add_argument("--dataset", help="Existing matched seed-101 dataset manifest or directory")
     parser.add_argument("--output", help="New ignored directory; omit for a UTC-timestamped run")
+    parser.add_argument("--fresh", action="store_true", help="Run all requested fits without reusing any unit/physical/delay cache")
+    parser.add_argument("--unit-cache-run", help="Optional Milestone 3 run override; default reuses artifacts/milestone3/20261012_seed101_verified if present")
+    parser.add_argument("--physical-cache-run", help="Optional Milestone 4 run override; default reuses artifacts/milestone4/20261013_seed101 if present")
+    parser.add_argument("--delay-cache-run", help="Optional Milestone 6 run override; default reuses artifacts/milestone6/20261013_seed101 if present")
     args = parser.parse_args()
+    caches = (args.unit_cache_run, args.physical_cache_run, args.delay_cache_run)
+    if args.fresh and any(caches):
+        parser.error("--fresh cannot be combined with explicit cache-run options")
+    if args.milestone < 6 and (args.fresh or any(caches)):
+        parser.error("Cache controls apply to --milestone 6 and later")
     config_path = (ROOT / args.config).resolve()
     registration_path = (ROOT / args.registration).resolve()
     model_path = ROOT / "model/pendulum.xml"
@@ -95,26 +126,34 @@ def main() -> int:
         from mujoco_sysid_lab.joint_experiment import run_milestone4
         try:
             return run_milestone4(ROOT, args, output)
-        except (ValueError, OSError, KeyError) as error:
-            parser.error(str(error))
+        except (Exception, KeyboardInterrupt) as error:
+            traceback.print_exc()
+            try:
+                record_orchestration_failure(output, error, phase="milestone4")
+            except Exception:
+                print("Failure journal could not be written; original traceback is above.", file=sys.stderr)
+                traceback.print_exc()
+            return 130 if isinstance(error, KeyboardInterrupt) else 1
     if args.milestone >= 6:
         from mujoco_sysid_lab.study_runner import run_study
+        phase = "study"
         try:
             status = run_study(ROOT, args, output, through=args.milestone)
             if status == 0 and args.milestone == 9:
+                phase = "curation"
                 from mujoco_sysid_lab.final_reporting import curate_results
                 curate_results(ROOT, output / "run.json", output / "curation",
                                [".venv/bin/python", "scripts/run_experiment.py", *sys.argv[1:]])
                 print(f"Public results and figures generated from {output.relative_to(ROOT)}")
             return status
-        except (ValueError, OSError, KeyError) as error:
-            if output.is_dir():
-                from mujoco_sysid_lab.provenance import write_json
-                write_json(output / "orchestration_failure.json", {
-                    "type": type(error).__name__, "message": str(error),
-                    "evidence_preserved": True,
-                })
-            parser.error(str(error))
+        except (Exception, KeyboardInterrupt) as error:
+            traceback.print_exc()
+            try:
+                record_orchestration_failure(output, error, phase=phase)
+            except Exception:
+                print("Failure journal could not be written; original traceback is above.", file=sys.stderr)
+                traceback.print_exc()
+            return 130 if isinstance(error, KeyboardInterrupt) else 1
 
     import numpy as np
     from mujoco_sysid_lab.dataset import array_sha256, load_training_sequences
@@ -276,8 +315,8 @@ def main() -> int:
                     row["status"] = "completed"
                     if clean_check and (not row["recovery_check"]["passed"] or not bool(execution.optimize_result.success)):
                         sanity_passed = False
-                except Exception as error:
-                    row["status"] = "failed"
+                except (Exception, KeyboardInterrupt) as error:
+                    row["status"] = "interrupted" if isinstance(error, KeyboardInterrupt) else "failed"
                     row["failure"] = {"type": type(error).__name__, "message": str(error)}
                     (fit_dir / "failure.txt").write_text(traceback.format_exc())
                     if problem is not None:
@@ -288,6 +327,11 @@ def main() -> int:
                         row["partial_objective_trace_sha256"] = sha256_file(fit_dir / "partial_objective_trace.json")
                     if clean_check:
                         sanity_passed = False
+                    if isinstance(error, KeyboardInterrupt):
+                        write_json(fit_dir / "result.json", row)
+                        record["fits"].append(row)
+                        write_json(output / "run.json", record)
+                        raise
                 write_json(fit_dir / "result.json", row)
                 record["fits"].append(row)
                 write_json(output / "run.json", record)
@@ -300,15 +344,19 @@ def main() -> int:
                           "single_seed_recovery_checks_passed": len(completed) == 4 and all(row["recovery_check"]["passed"] for row in completed),
                           "joint_recovery_and_heldout_improvement_evaluated": False}
         record["status"] = "passed" if len(completed) == 4 and sanity_passed and all(row["recovery_check"]["passed"] for row in completed) else "failed"
-    except Exception as error:
-        record["status"] = "failed"
+    except (Exception, KeyboardInterrupt) as error:
+        record["status"] = "interrupted" if isinstance(error, KeyboardInterrupt) else "failed"
         record["failure"] = {"type": type(error).__name__, "message": str(error)}
         (output / "failure.txt").write_text(traceback.format_exc())
+        write_json(output / "run.json", record)
+        traceback.print_exc()
+        record_orchestration_failure(output, error, phase="milestone3")
+        record = json.loads((output / "run.json").read_text())
     record["wall_seconds"] = perf_counter() - started
     write_json(output / "run.json", record)
     print(f"Milestone 3 {record['status']}: {output.relative_to(ROOT)}")
     print(f"Registered completed fits: {record.get('registered_evidence_fit_count', 0)}/82; joint recovery remains unrun.")
-    return 0 if record["status"] == "passed" else 1
+    return 0 if record["status"] == "passed" else (130 if record["status"] == "interrupted" else 1)
 
 
 if __name__ == "__main__":

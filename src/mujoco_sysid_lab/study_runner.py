@@ -4,10 +4,15 @@ from __future__ import annotations
 from contextlib import redirect_stdout, redirect_stderr
 from dataclasses import replace
 from datetime import datetime, timezone
+import hashlib
+import io
 import json
 from pathlib import Path
 import pickle
+import subprocess
 import sys
+import tarfile
+import tempfile
 from time import perf_counter
 import traceback
 
@@ -18,6 +23,105 @@ from mujoco_sysid_lab.experiment_config import config_to_dict, load_study_config
 from mujoco_sysid_lab.identification import build_problem
 from mujoco_sysid_lab.fit_reporting import summarize_optimization, save_official_fit
 from mujoco_sysid_lab.provenance import collect_provenance, sha256_file, snapshot_sources, write_json
+
+
+LEGACY_CACHE_RUNS = {
+    "unit": "artifacts/milestone3/20261012_seed101_verified",
+    "physical": "artifacts/milestone4/20261013_seed101",
+    "delay": "artifacts/milestone6/20261013_seed101",
+}
+_ESTIMATOR_SOURCES = ("src/mujoco_sysid_lab/identification.py", "src/mujoco_sysid_lab/api_check.py",
+                      "src/mujoco_sysid_lab/simulation.py", "src/mujoco_sysid_lab/experiment_config.py")
+
+
+def cache_directory(root: Path, supplied, kind: str) -> Path:
+    """Optional historical reuse by default; explicit paths must exist."""
+    path = root / (supplied if supplied is not None else LEGACY_CACHE_RUNS[kind])
+    if path.name == "run.json":
+        path = path.parent
+    path = path.resolve()
+    if not path.is_relative_to((root / "artifacts").resolve()):
+        raise ValueError("Cache runs must be retained evidence under artifacts/")
+    if supplied is not None and not (path / "run.json").is_file():
+        raise ValueError(f"Explicit {kind} cache run is missing run.json: {path}")
+    return path
+
+
+def verify_cache_source(root: Path, provenance: dict) -> dict:
+    """Verify original estimator bytes, allowing audited legacy hook versions.
+
+    Source provenance proves what ran. Compatibility is then checked by the
+    frozen model/config/options/training inputs and the shared objective replay,
+    rather than pretending old and current reporting/delay source are identical.
+    """
+    commit = provenance["git"]["commit"]
+    ledger = provenance["source_sha256"]
+    critical = {*_ESTIMATOR_SOURCES, provenance["config"]["path"],
+                provenance["model"]["path"], provenance["lock"]["path"]}
+    if None in critical or not critical <= ledger.keys():
+        raise ValueError("Cached source provenance lacks required estimator/config/model/lock hashes")
+    if any(provenance[name]["sha256"] != ledger[provenance[name]["path"]] for name in ("config", "model", "lock")):
+        raise ValueError("Cached config/model/lock metadata disagrees with source ledger")
+    if provenance["mujoco_version"] != "3.15.0" or provenance["python"]["version"] != "3.12.5":
+        raise ValueError("Cached source violates pinned MuJoCo/Python")
+    if any(provenance["package_versions"].get(name) != version for name, version in
+           {"mujoco": "3.15.0", "numpy": "2.3.3", "scipy": "1.16.2"}.items()):
+        raise ValueError("Cached estimator libraries differ from registered pins")
+    if provenance["git"]["dirty"]:
+        snapshot = provenance.get("source_snapshot")
+        if snapshot is None:
+            raise ValueError("Dirty cache requires a reconstructable source snapshot")
+        directory = (root / snapshot["path"]).resolve()
+        if not directory.is_relative_to((root / "artifacts").resolve()):
+            raise ValueError("Cache source snapshot escapes artifacts/")
+        manifest_path = directory / "manifest.json"
+        if sha256_file(manifest_path) != snapshot["manifest_sha256"]:
+            raise ValueError("Cache source snapshot manifest changed")
+        manifest = json.loads(manifest_path.read_text())
+        patch = directory / manifest["tracked_patch"]["path"]
+        if (manifest["base_commit"] != commit or snapshot["base_commit"] != commit
+                or manifest["source_sha256"] != ledger or snapshot["source_sha256"] != ledger
+                or sha256_file(patch) != manifest["tracked_patch"]["sha256"]
+                or sha256_file(patch) != snapshot["tracked_patch_sha256"]):
+            raise ValueError("Cache source snapshot/patch ledger changed")
+        with tempfile.TemporaryDirectory(prefix="sysid_cache_source_") as temporary:
+            tree = Path(temporary).resolve()
+            result = subprocess.run(["git", "-C", str(root), "archive", "--format=tar", commit],
+                                    check=True, capture_output=True)
+            with tarfile.open(fileobj=io.BytesIO(result.stdout)) as archive:
+                for member in archive.getmembers():
+                    target = (tree / member.name).resolve()
+                    if not target.is_relative_to(tree) or not (member.isdir() or member.isfile()):
+                        raise ValueError("Unsafe cached Git source archive")
+                    if member.isfile():
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        with archive.extractfile(member) as stream:
+                            target.write_bytes(stream.read())
+            if patch.stat().st_size:
+                subprocess.run(["git", "apply", "--binary", "--whitespace=nowarn", str(patch)],
+                               cwd=tree, check=True, capture_output=True)
+            for relative in manifest["untracked_sources"]:
+                original, target = (directory / "untracked" / relative).resolve(), (tree / relative).resolve()
+                if not original.is_relative_to(directory / "untracked") or not target.is_relative_to(tree):
+                    raise ValueError("Unsafe cached untracked source path")
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(original.read_bytes())
+            if any(sha256_file(tree / path) != ledger[path] for path in critical):
+                raise ValueError("Reconstructed cached estimator source hash changed")
+            if json.loads((tree / provenance["config"]["path"]).read_text()) != provenance["config"]["content"]:
+                raise ValueError("Cached exact config content disagrees with original source")
+    else:
+        for path in critical:
+            result = subprocess.run(["git", "-C", str(root), "show", f"{commit}:{path}"],
+                                    check=True, capture_output=True)
+            if hashlib.sha256(result.stdout).hexdigest() != ledger[path]:
+                raise ValueError(f"Cached estimator source hash changed: {path}")
+            if path == provenance["config"]["path"] and json.loads(result.stdout) != provenance["config"]["content"]:
+                raise ValueError("Cached exact config content disagrees with original source")
+    return {"policy": "frozen noise-normalized joint-sensor objective v1; original source bytes verified; objective replay required",
+            "source_commit": commit, "source_dirty": provenance["git"]["dirty"],
+            "estimator_source_sha256": {path: ledger[path] for path in sorted(critical)},
+            "current_source_byte_equality_required": False}
 
 
 def file_ref(path: Path, root: Path) -> dict:
@@ -98,6 +202,11 @@ def fit_one(training, study, model_path: Path, physical, free_parameters: tuple[
                                                      title=f"{fit_id}: synthetic SysID", fit_scope=("oracle_assisted_single_parameter"
                                                      if cell in ("A1", "A2") else "registered_ablation"))
         row["status"] = "completed"
+    except KeyboardInterrupt:
+        row["status"] = "interrupted"
+        row["failure"] = {"type": "KeyboardInterrupt", "message": "Optimization/reporting interrupted"}
+        (directory / "failure.txt").write_text(traceback.format_exc())
+        raise
     except Exception as error:
         row["status"] = "post_optimization_failed" if execution is not None else "optimization_failed"
         row["failure"] = {"type": type(error).__name__, "message": str(error)}
@@ -133,6 +242,20 @@ def validate_cached_identity(row: dict, training, study, physical, free: tuple[s
             or row["training_ids"] != [sequence.trajectory_name for sequence in training.sequences]
             or row["input_array_sha256"] != training_hashes(training)):
         raise ValueError("Cached fit identity, start, physical constants, or training arrays differ")
+    validate_cached_options(row, study, free)
+
+
+def validate_cached_options(row: dict, study, free: tuple[str, ...]) -> None:
+    """Recorded effective solver settings must agree with the frozen config."""
+    if "optimizer_options" in row and row["optimizer_options"] != config_to_dict(study.optimizer):
+        raise ValueError("Cached optimizer options differ")
+    if "resolved_optimizer_options" in row:
+        bounds = {"mass_kg": study.mass_bounds_kg, "damping_nm_s_per_rad": study.damping_bounds_nm_s_per_rad,
+                  "delay_s": study.delay_bounds_s}
+        expected = {name: study.optimizer[name] for name in ("method", "loss", "max_iters", "ftol", "xtol", "gtol", "diff_step")}
+        expected["x_scale"] = [bounds[name].upper - bounds[name].lower for name in free]
+        if row["resolved_optimizer_options"] != expected:
+            raise ValueError("Cached resolved optimizer options differ")
 
 
 def enrich_parameters(row: dict, truth_values: dict) -> list[dict]:
@@ -146,11 +269,12 @@ def enrich_parameters(row: dict, truth_values: dict) -> list[dict]:
     return rows
 
 
-def cached_B(root: Path, training, study, model_path: Path) -> tuple[list[dict], Path] | None:
-    source = root / "artifacts/milestone4/20261013_seed101"
+def cached_B(root: Path, training, study, model_path: Path, *, cache_run=None) -> tuple[list[dict], Path] | None:
+    source = cache_directory(root, cache_run, "physical")
     if training.seed != 101 or not (source / "run.json").is_file():
         return None
     record = json.loads((source / "run.json").read_text())
+    compatibility = verify_cache_source(root, record["provenance"])
     if (record["provenance"]["config"]["sha256"] != sha256_file(root / "configs/evidence_v1.json")
             or record["provenance"]["model"]["sha256"] != sha256_file(model_path)):
         raise ValueError("Existing B evidence has different config or model")
@@ -171,15 +295,17 @@ def cached_B(root: Path, training, study, model_path: Path) -> tuple[list[dict],
                                  ("mass_kg", "damping_nm_s_per_rad"), "B", old_B=True)
         if row["optimizer_options"] != config_to_dict(study.optimizer):
             raise ValueError("Cached B optimizer options differ")
+        row["cache_compatibility"] = compatibility
         rows.append(row)
     return rows, source
 
 
-def cached_milestone6(root: Path, cell: str, training, study, model_path: Path, physical, free: tuple[str, ...]) -> tuple[list[dict], Path] | None:
-    source = root / "artifacts/milestone6/20261013_seed101"
+def cached_milestone6(root: Path, cell: str, training, study, model_path: Path, physical, free: tuple[str, ...], *, cache_run=None) -> tuple[list[dict], Path] | None:
+    source = cache_directory(root, cache_run, "delay")
     if training.seed != 101 or cell == "B" or not (source / "run.json").is_file():
         return None
     run = json.loads((source / "run.json").read_text())
+    compatibility = verify_cache_source(root, run["provenance"])
     if (run["provenance"]["config"]["sha256"] != sha256_file(root / "configs/evidence_v1.json")
             or run["provenance"]["model"]["sha256"] != sha256_file(model_path)):
         raise ValueError("Milestone 6 cache config changed")
@@ -196,6 +322,7 @@ def cached_milestone6(root: Path, cell: str, training, study, model_path: Path, 
             raise ValueError("Milestone 6 cached result changed")
         row = json.loads(path.read_text())
         validate_cached_identity(row, training, study, physical, free, cell)
+        row["cache_compatibility"] = compatibility
         rows.append(row)
     expected_starts = {"S0"} if cell == "C_delay_only" else {"S0", "S1", "S2"}
     if len(rows) != len(expected_starts) or {row["start_id"] for row in rows} != expected_starts:
@@ -203,12 +330,13 @@ def cached_milestone6(root: Path, cell: str, training, study, model_path: Path, 
     return rows, source / "fits"
 
 
-def cached_units(root: Path, training, study, model_path: Path) -> list[dict] | None:
-    source = root / "artifacts/milestone3/20261012_seed101_verified"
+def cached_units(root: Path, training, study, model_path: Path, *, cache_run=None) -> list[dict] | None:
+    source = cache_directory(root, cache_run, "unit")
     if not (source / "run.json").is_file():
         return None
     path = source / "run.json"
     run = json.loads(path.read_text())
+    compatibility = verify_cache_source(root, run["provenance"])
     if (run["provenance"]["config"]["sha256"] != sha256_file(root / "configs/evidence_v1.json")
             or run["provenance"]["model"]["sha256"] != sha256_file(model_path)):
         raise ValueError("Cached unit config differs")
@@ -218,13 +346,16 @@ def cached_units(root: Path, training, study, model_path: Path) -> list[dict] | 
             continue
         if row["input_array_sha256"] != training_hashes(training):
             raise ValueError("Cached unit training differs")
+        optimization_source = verify_cache_source(root, row.get("optimization_provenance", row["provenance"]))
         parameter_rows = row["summary"]["parameter_rows"]
+        validate_cached_options(row, study, tuple(row["free_parameters"]))
         rows.append({**row, "optimization_summary": row["summary"], "parameter_rows": parameter_rows,
                      "optimization_invoked": True, "optimization_returned": True,
                      "optimizer_success": row["summary"]["optimizer"]["success"],
                      "optimized_vector": [parameter["estimate"] for parameter in parameter_rows],
                      "final_objective": row["summary"]["objective"]["final"], "reused": True,
                      "source_result": file_ref(path, root), "source_fit_id": row["fit_id"],
+                     "cache_compatibility": {"report_source": compatibility, "optimization_source": optimization_source},
                      "source_official_directory": (source / "fits" / row["fit_id"] / "official").relative_to(root).as_posix()})
     return rows
 
@@ -249,6 +380,9 @@ def run_study(root: Path, args, output: Path, *, through: int = 9) -> int:
         provenance["source_snapshot"] = snapshot_sources(root, output / "source_snapshot")
     write_json(output / "registration.json", registration)
     write_json(output / "provenance.json", provenance)
+    write_json(output / "run.json", {"schema_version": "mujoco-sysid-lab.full-run.v1", "status": "running",
+               "phase": "api_contract", "provenance": provenance, "fits": [], "groups": [],
+               "datasets": {}, "milestones": [], "wall_seconds": perf_counter() - started})
     timing_contract = check_api(model_path, study.nominal)
     write_json(output / "api_contract.json", {"provenance": provenance, "checks": timing_contract,
                                               "fixed_grid_delay_crop_regression": "Locally verified by tests/test_sysid_contract.py; official resampler on exact fixed grid"})
@@ -260,41 +394,84 @@ def run_study(root: Path, args, output: Path, *, through: int = 9) -> int:
     cells = ("B", "delay_excluded", "C_delay_only", "C_joint") if through == 6 else (
         "B", "weak", "delay_excluded", "C_delay_only", "C_joint", *(("E",) if through >= 8 else ()))
     specifications = {row["id"]: row for row in study.evidence_matrix}
+    progress = {"phase": "prepared", "active_group": None, "active_fit": None, "active_dataset": None}
+    fresh = bool(getattr(args, "fresh", False))
+    cache_policy = {"fresh": fresh, "runs": {kind: None if fresh else (getattr(args, f"{kind}_cache_run", None)
+                    or default) for kind, default in LEGACY_CACHE_RUNS.items()}}
 
     def checkpoint():
         write_json(output / "run.json", {"schema_version": "mujoco-sysid-lab.full-run.v1", "status": "running",
                    "provenance": provenance, "fits": all_rows, "groups": groups, "datasets": datasets,
-                   "milestones": milestones, "wall_seconds": perf_counter() - started})
+                   "milestones": milestones, "progress": progress, "cache_policy": cache_policy,
+                   "wall_seconds": perf_counter() - started})
+
+    def retain(rows):
+        for row in rows:
+            index = next((index for index, existing in enumerate(all_rows) if existing["fit_id"] == row["fit_id"]), None)
+            if index is None:
+                all_rows.append(row)
+            else:
+                all_rows[index] = row
+        checkpoint()
+
+    def fit_and_retain(training, physical, free, start, fit_id, cell, start_id, directory, fit_provenance):
+        progress.update(phase="fitting", active_fit=fit_id)
+        prepared = {"fit_id": fit_id, "cell": cell, "seed": training.seed, "start_id": start_id,
+                    "status": "prepared", "free_parameters": list(free), "starting_values": start,
+                    "optimization_invoked": False, "optimization_returned": False, "reused": False,
+                    "provenance": fit_provenance}
+        retain([prepared])
+        try:
+            row = fit_one(training, study, model_path, physical, free, start, fit_id, cell, start_id,
+                          directory, fit_provenance)
+        except BaseException:
+            # The worker's finally block persists flags/partial traces even on
+            # interruption. Reflect those exact bytes in the parent journal.
+            result = directory / "result.json"
+            if result.is_file():
+                retain([{**json.loads(result.read_text()), "reused": False,
+                         "source_result": file_ref(result, root)}])
+            raise
+        row = {**row, "reused": False, "source_result": file_ref(directory / "result.json", root)}
+        retain([row])
+        progress["active_fit"] = None
+        return row
 
     def scenario_for(seed, scenario):
         key = f"{scenario}_seed{seed}"
         if key not in scenario_cache:
+            progress.update(phase="dataset_generation", active_dataset=key)
+            checkpoint()
             data = create_scenario(study, truth, model_path, seed, scenario)
             directory = output / "datasets" / key
             dataset_provenance = {**provenance, "seed": seed, "scenario": scenario}
             manifest = write_scenario(directory, data, dataset_provenance)
             datasets[key] = file_ref(manifest, root)
             scenario_cache[key] = data
+            progress["active_dataset"] = None
+            checkpoint()
         return scenario_cache[key]
 
     scenario_cache = {}
+    checkpoint()
     if through >= 7:
         unit_data = scenario_for(101, "matched")
-        units = cached_units(root, unit_data.training, study, model_path)
+        units = None if fresh else cached_units(root, unit_data.training, study, model_path,
+                                                cache_run=getattr(args, "unit_cache_run", None))
         if units is None:
             units = []
             for cell in ("A1", "A2"):
                 free = tuple(specifications[cell]["free_parameters"])
                 physical = replace(study.nominal, **({"damping_nm_s_per_rad": truth.model.damping_nm_s_per_rad}
                                                        if cell == "A1" else {"mass_kg": truth.model.mass_kg}))
-                row = fit_one(unit_data.training, study, model_path, physical, free,
+                row = fit_and_retain(unit_data.training, physical, free,
                               {name: getattr(study.starts["S0"], name) for name in free}, f"{cell}_seed101_S0", cell,
                               "S0", output / "fits" / f"{cell}_seed101_S0", {**provenance, "seed": 101, "cell": cell})
                 row.update(reused=False, parameter_rows=enrich_parameters(row, {"mass_kg": truth.model.mass_kg,
                              "damping_nm_s_per_rad": truth.model.damping_nm_s_per_rad}),
                            source_result=file_ref(output / "fits" / row["fit_id"] / "result.json", root))
                 units.append(row)
-        all_rows.extend(units)
+        retain(units)
     for cell in cells:
         for seed in seeds:
             matrix = specifications[cell]
@@ -303,6 +480,8 @@ def run_study(root: Path, args, output: Path, *, through: int = 9) -> int:
             training = data.training
             free = tuple(matrix["free_parameters"])
             group_id = f"{cell}_seed{seed}"
+            progress.update(phase="group_preparation", active_group=group_id, active_fit=None)
+            checkpoint()
             directory = output / "groups" / group_id
             directory.mkdir(parents=True, exist_ok=False)
             physical = study.nominal
@@ -318,8 +497,10 @@ def run_study(root: Path, args, output: Path, *, through: int = 9) -> int:
                 if previous is None or not previous.get("joint_delay_eligible"):
                     prerequisite = "Same-seed delay-only one-timestep prerequisite failed"
             rows, source = [], output / "fits"
-            cache = None if prerequisite else (cached_B(root, training, study, model_path) if cell == "B" else
-                                               cached_milestone6(root, cell, training, study, model_path, physical, free))
+            cache = None if prerequisite or fresh else (
+                cached_B(root, training, study, model_path, cache_run=getattr(args, "physical_cache_run", None)) if cell == "B" else
+                cached_milestone6(root, cell, training, study, model_path, physical, free,
+                                 cache_run=getattr(args, "delay_cache_run", None)))
             if cache:
                 rows, source = cache
             elif prerequisite:
@@ -335,14 +516,19 @@ def run_study(root: Path, args, output: Path, *, through: int = 9) -> int:
                     if cell == "C_delay_only":
                         start = {"delay_s": study.optimizer["delay_only_start_s"]}
                     fit_id = f"{cell}_seed{seed}_{start_id}"
-                    rows.append(fit_one(training, study, model_path, physical, free, start, fit_id, cell, start_id,
+                    rows.append(fit_and_retain(training, physical, free, start, fit_id, cell, start_id,
                                         source / fit_id, {**provenance, "seed": seed, "cell": cell,
                                             "dataset_input": datasets[f"{scenario}_seed{seed}"]}))
+            retain([{**row, "reused": bool(cache)} for row in rows])
+            progress.update(phase="training_selection", active_fit=None)
+            checkpoint()
             selection = select_rows(rows, free)
             selection_path = directory / "selection.json"
             write_json(selection_path, selection)
             selection_hash = sha256_file(selection_path)
             # Only sealed candidates can enter truth/held-out scoring.
+            progress["phase"] = "evaluation"
+            checkpoint()
             nominal = evaluate_model(data, study.nominal, model_path, study, delay_s=0.)
             oracle = evaluate_model(data, truth.model, model_path, study, delay_s=data.delay_s)
             evaluated_rows = []
@@ -396,13 +582,24 @@ def run_study(root: Path, args, output: Path, *, through: int = 9) -> int:
             if sha256_file(selection_path) != selection_hash:
                 raise ValueError("Post-fit evaluation changed sealed selection")
             groups.append(group)
-            all_rows.extend(evaluated_rows)
+            retain(evaluated_rows)
+            progress.update(phase="group_completed", active_group=None)
             checkpoint()
             print(f"{group_id}: {selection['selected_fit_id']} ({len(rows)} retained starts)", flush=True)
         if cell in ("C_joint", "E"):
             milestone = 6 if cell == "C_joint" and through == 6 else (7 if cell == "C_joint" else 8)
-            milestones.append({"milestone": milestone, "status": "verified", "fits_retained": len(all_rows)})
-            print(f"Milestone {milestone} checkpoint verified", flush=True)
+            executed_cells = cells[:cells.index(cell) + 1]
+            checkpoint_rows = [row for row in all_rows if row["cell"] in executed_cells or row["cell"] in ("A1", "A2")]
+            expected_count = sum(len(specifications[name]["start_ids"]) * len(seeds) for name in executed_cells)
+            if through >= 7:
+                expected_count += 2
+            verified = len(checkpoint_rows) == expected_count and all(row["status"] == "completed" for row in checkpoint_rows)
+            milestone_status = "verified" if verified else "incomplete"
+            milestones.append({"milestone": milestone, "status": milestone_status, "fits_retained": len(checkpoint_rows),
+                               "expected_fit_count": expected_count,
+                               "scientific_criteria": "Assessed separately; this status describes execution and prerequisite completeness."})
+            checkpoint()
+            print(f"Milestone {milestone} checkpoint {milestone_status}", flush=True)
     expected_ids = {f"{cell}_seed{seed}_{start_id}" for cell in cells for seed in seeds for start_id in specifications[cell]["start_ids"]}
     if through >= 7:
         expected_ids.update(("A1_seed101_S0", "A2_seed101_S0"))
@@ -415,6 +612,7 @@ def run_study(root: Path, args, output: Path, *, through: int = 9) -> int:
               "provenance": provenance, "fits": all_rows, "groups": groups, "datasets": datasets,
               "milestones": milestones, "wall_seconds": perf_counter() - started,
               "registered_matrix_total": 82, "matrix_accounting": accounting,
+              "progress": {**progress, "phase": "completed"}, "cache_policy": cache_policy,
               "api_contract": file_ref(output / "api_contract.json", root),
               "optimization_calls_this_invocation": sum(bool(row.get("optimization_invoked")) and not row["reused"] for row in all_rows),
               "reused_registered_fits": sum(row["reused"] for row in all_rows), "through_milestone": through}

@@ -8,6 +8,7 @@ scientific recovery behavior.
 from dataclasses import replace
 import json
 from pathlib import Path
+import subprocess
 from types import SimpleNamespace
 
 import numpy as np
@@ -107,10 +108,13 @@ def test_delay_only_single_start_is_valid():
 
 
 @pytest.fixture
-def cached_root(tmp_path, training, study, provenance):
+def cached_root(tmp_path, training, study, provenance, monkeypatch):
     # A complete labeled mock cache, using the real registered config/model
     # bytes and current test-command provenance, not invented source IDs.
     root = tmp_path / "mock_cache"
+    # Cache semantic tests use labeled mock provenance; original Git source
+    # verification is exercised independently below with real cloned fixtures.
+    monkeypatch.setattr(runner, "verify_cache_source", lambda *args: {"test_fixture": True})
     (root / "configs").mkdir(parents=True)
     (root / "model").mkdir()
     (root / "configs/evidence_v1.json").write_bytes((ROOT / "configs/evidence_v1.json").read_bytes())
@@ -201,6 +205,8 @@ def test_cache_rejects_changed_training_arrays(cached_root, training, study):
     ("start_id", "S1"), ("free_parameters", list(reversed(FREE))),
     ("starting_values", {"mass_kg": 1.2, "damping_nm_s_per_rad": .15}),
     ("training_ids", ["heldout_chirp", "heldout_pulse"]),
+    ("resolved_optimizer_options", {"max_iters": 1}),
+    ("optimizer_options", {"backend": "unregistered"}),
 ])
 def test_cache_semantics_cannot_be_changed_by_rehashing(cached_root, training, study, field, value):
     root, source = cached_root
@@ -299,6 +305,27 @@ def test_worker_optimizer_failure_retains_actual_flag_and_partial_ledger(tmp_pat
     assert runner.select_rows([row], FREE)["selected_fit_id"] is None
 
 
+def test_worker_interruption_preserves_flag_partial_trace_and_ledger(tmp_path, training, study, provenance, monkeypatch):
+    problem = mocked_problem()
+
+    def interrupted():
+        problem.optimization_invoked = True
+        problem.last_trace = [{"event": "initial", "candidate": [.8, .04], "objective": 3.}]
+        raise KeyboardInterrupt()
+
+    problem.run = interrupted
+    monkeypatch.setattr(runner, "build_problem", lambda *args, **kwargs: problem)
+    with pytest.raises(KeyboardInterrupt):
+        runner.fit_one(training, study, MODEL, study.nominal, FREE,
+                       {"mass_kg": .8, "damping_nm_s_per_rad": .04},
+                       "B_seed101_S0", "B", "S0", tmp_path / "fit", provenance)
+    row = json.loads((tmp_path / "fit/result.json").read_text())
+    assert row["status"] == "interrupted"
+    assert row["optimization_invoked"] and not row["optimization_returned"]
+    assert row["call_counts"]["optimization"]["residual_calls"] == 1
+    assert (tmp_path / "fit/objective_trace.json").is_file()
+
+
 def test_worker_prefit_failure_does_not_claim_optimizer_invocation(tmp_path, training, study, provenance, monkeypatch):
     def invalid_problem(*args, **kwargs):
         raise ValueError("mocked input validation failure")
@@ -372,6 +399,10 @@ def mocked_study(tmp_path, training, study, provenance, monkeypatch):
     monkeypatch.setattr(advanced_data, "write_scenario", write)
 
     def worker(data, study, model_path, physical, free, start, fit_id, cell, start_id, directory, provenance):
+        journal = json.loads((output / "run.json").read_text())
+        prepared = next(row for row in journal["fits"] if row["fit_id"] == fit_id)
+        assert prepared["status"] == "prepared"
+        assert journal["progress"]["active_fit"] == fit_id
         assert isinstance(data, TrainingDataset)
         assert not hasattr(data, "records") and not hasattr(data, "metadata")
         assert all(sequence.trajectory_name.startswith("train_") or sequence.trajectory_name == "weak_step"
@@ -400,6 +431,9 @@ def mocked_study(tmp_path, training, study, provenance, monkeypatch):
         # Current group exists before evaluation, so any missing seal indicates
         # evaluation preceded training-only selection.
         assert all((directory / "selection.json").is_file() for directory in (output / "groups").iterdir())
+        journal = json.loads((output / "run.json").read_text())
+        assert journal["progress"]["phase"] == "evaluation"
+        assert all(row["status"] in ("completed", "not_run") for row in journal["fits"])
         state["evaluations"].append((data.scenario, data.seed, physical, delay_s))
         train_rows = [{"trajectory_id": sequence.trajectory_name, "n_samples": 1,
                        "normalized_rmse": 1.} for sequence in data.training.sequences]
@@ -461,6 +495,7 @@ def test_failed_prerequisites_retain_not_run_rows_and_cannot_use_cache(mocked_st
     assert result["optimization_calls_this_invocation"] == 82 - expected_not_run
     cells = {row["cell"] for row in not_run}
     assert cells == ({"C_delay_only", "C_joint"} if failure == "fail_B_physics" else {"C_joint"})
+    assert all(row["status"] == "incomplete" for row in result["milestones"])
 
 
 def test_milestone6_only_runs_seed101_registered_delay_cells(mocked_study):
@@ -472,3 +507,133 @@ def test_milestone6_only_runs_seed101_registered_delay_cells(mocked_study):
     assert {row["seed"] for row in result["fits"]} == {101}
     assert result["registered_matrix_total"] == 82
     assert result["through_milestone"] == 6
+
+
+def test_fresh_disables_every_cache_lookup(mocked_study, monkeypatch):
+    root, output, args, _ = mocked_study
+    args.fresh = True
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("Fresh execution consulted a cache")
+
+    for name in ("cached_units", "cached_B", "cached_milestone6"):
+        monkeypatch.setattr(runner, name, forbidden)
+    assert runner.run_study(root, args, output, through=9) == 0
+    result = json.loads((output / "run.json").read_text())
+    assert result["cache_policy"]["fresh"]
+    assert result["optimization_calls_this_invocation"] == 82
+    assert result["reused_registered_fits"] == 0
+
+
+def test_cache_override_flags_are_passed_to_exact_worker_cache(mocked_study, monkeypatch):
+    root, output, args, _ = mocked_study
+    args.unit_cache_run = "artifacts/custom_units"
+    args.physical_cache_run = "artifacts/custom_physical"
+    args.delay_cache_run = "artifacts/custom_delay"
+    calls = []
+
+    def cache(kind):
+        def call(*args, cache_run):
+            calls.append((kind, cache_run))
+            return None
+        return call
+
+    monkeypatch.setattr(runner, "cached_units", cache("unit"))
+    monkeypatch.setattr(runner, "cached_B", cache("physical"))
+    monkeypatch.setattr(runner, "cached_milestone6", cache("delay"))
+    assert runner.run_study(root, args, output, through=9) == 0
+    assert set(calls) == {("unit", args.unit_cache_run), ("physical", args.physical_cache_run), ("delay", args.delay_cache_run)}
+
+
+@pytest.mark.parametrize("error", [RuntimeError("mock evaluation failure"), KeyboardInterrupt()])
+def test_progress_journal_contains_completed_numerical_rows_before_evaluation_failure(mocked_study, monkeypatch, error):
+    from mujoco_sysid_lab import full_evaluation
+    root, output, args, _ = mocked_study
+
+    def failed(*args, **kwargs):
+        raise error
+
+    monkeypatch.setattr(full_evaluation, "evaluate_model", failed)
+    with pytest.raises(type(error)):
+        runner.run_study(root, args, output, through=6)
+    journal = json.loads((output / "run.json").read_text())
+    assert journal["progress"]["active_group"] == "B_seed101"
+    assert journal["progress"]["phase"] == "evaluation"
+    assert len(journal["fits"]) == 3
+    assert all(row["status"] == "completed" and row["optimization_returned"] for row in journal["fits"])
+    assert (output / "groups/B_seed101/selection.json").is_file()
+    for row in journal["fits"]:
+        assert sha256_file(root / row["source_result"]["path"]) == row["source_result"]["sha256"]
+
+
+def test_dataset_generation_failure_has_an_initial_progress_journal(mocked_study, monkeypatch):
+    from mujoco_sysid_lab import advanced_data
+    root, output, args, _ = mocked_study
+
+    def failed(*args, **kwargs):
+        raise RuntimeError("mock dataset failure")
+
+    monkeypatch.setattr(advanced_data, "create_scenario", failed)
+    with pytest.raises(RuntimeError, match="dataset failure"):
+        runner.run_study(root, args, output, through=6)
+    journal = json.loads((output / "run.json").read_text())
+    assert journal["fits"] == []
+    assert journal["progress"]["phase"] == "dataset_generation"
+    assert journal["progress"]["active_dataset"] == "matched_seed101"
+
+
+def test_cache_directory_optional_default_explicit_override_and_scope(tmp_path):
+    assert runner.cache_directory(tmp_path, None, "unit") == tmp_path / runner.LEGACY_CACHE_RUNS["unit"]
+    custom = tmp_path / "artifacts/custom"
+    custom.mkdir(parents=True)
+    (custom / "run.json").write_text('{"test_fixture":true}')
+    assert runner.cache_directory(tmp_path, "artifacts/custom/run.json", "unit") == custom
+    with pytest.raises(ValueError, match="missing"):
+        runner.cache_directory(tmp_path, "artifacts/missing", "unit")
+    with pytest.raises(ValueError, match="artifacts"):
+        runner.cache_directory(tmp_path, "../outside", "unit")
+
+
+@pytest.fixture
+def cached_source_tree(tmp_path):
+    # Local read-only source clone; no evidence runs and no project commits.
+    root = tmp_path / "source_fixture"
+    subprocess.run(["git", "clone", "--quiet", "--shared", str(ROOT), str(root)], check=True)
+    return root
+
+
+def test_cache_source_verifies_original_git_hashes_and_permits_legacy_code(cached_source_tree):
+    root = cached_source_tree
+    record = collect_provenance(root, root / "configs/evidence_v1.json", root / "model/pendulum.xml",
+                                ["python", "-m", "pytest", "labeled source fixture"])
+    assert record["git"]["dirty"] is False
+    (root / "src/mujoco_sysid_lab/api_check.py").write_text("# later checkout change\n")
+    result = runner.verify_cache_source(root, record)
+    assert result["source_dirty"] is False
+    assert result["current_source_byte_equality_required"] is False
+    original_hash = record["source_sha256"]["src/mujoco_sysid_lab/api_check.py"]
+    record["source_sha256"]["src/mujoco_sysid_lab/api_check.py"] = "0" * 64
+    with pytest.raises(ValueError, match="source hash changed"):
+        runner.verify_cache_source(root, record)
+    record["source_sha256"]["src/mujoco_sysid_lab/api_check.py"] = original_hash
+    record["package_versions"]["numpy"] = "unregistered fixture version"
+    with pytest.raises(ValueError, match="libraries differ"):
+        runner.verify_cache_source(root, record)
+
+
+def test_cache_source_dirty_patch_reconstruction_and_tamper_rejection(cached_source_tree):
+    from mujoco_sysid_lab.provenance import snapshot_sources
+    root = cached_source_tree
+    path = root / "src/mujoco_sysid_lab/api_check.py"
+    path.write_text(path.read_text() + "\n# authored dirty source fixture\n")
+    record = collect_provenance(root, root / "configs/evidence_v1.json", root / "model/pendulum.xml",
+                                ["python", "-m", "pytest", "labeled dirty source fixture"])
+    assert record["git"]["dirty"] is True
+    with pytest.raises(ValueError, match="snapshot"):
+        runner.verify_cache_source(root, record)
+    record["source_snapshot"] = snapshot_sources(root, root / "artifacts/source_snapshot")
+    assert runner.verify_cache_source(root, record)["source_dirty"] is True
+    patch = root / "artifacts/source_snapshot/tracked.patch"
+    patch.write_text(patch.read_text() + "\n")
+    with pytest.raises(ValueError, match="ledger changed"):
+        runner.verify_cache_source(root, record)

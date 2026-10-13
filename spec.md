@@ -1,4 +1,4 @@
-# Proposed experimental specification v0.1
+# Registered experimental specification v0.1
 
 Status: user approved v0.1 on 2026-10-12. The complete scientific configuration was frozen before identification in configs/evidence_v1.json and docs/results/registration_v1.json. Milestones 1–8 have completed all 82 registered fits with five seeds and three starts; final curation/audit passed. Outcomes are in docs/results/summary.json. No outcome-driven revision is allowed.
 

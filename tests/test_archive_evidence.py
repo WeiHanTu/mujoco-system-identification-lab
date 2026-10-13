@@ -5,6 +5,7 @@ import importlib.util
 import io
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import tarfile
 
@@ -14,6 +15,7 @@ from mujoco_sysid_lab import provenance
 
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts/archive_evidence.py"
+HISTORICAL_CHECKPOINT = Path("artifacts/milestone5/20261013_seed101")
 spec = importlib.util.spec_from_file_location("archive_evidence", SCRIPT)
 archive_evidence = importlib.util.module_from_spec(spec)
 assert spec.loader is not None
@@ -57,7 +59,7 @@ def fixture(tmp_path, monkeypatch):
     save(m6 / "run.json", {"provenance": original, "fits": [{"source_result": {
         "path": (m4 / "fits/B_S0/result.json").relative_to(tmp_path).as_posix(),
         "sha256": provenance.sha256_file(m4 / "fits/B_S0/result.json")}}]})
-    checkpoint = tmp_path / archive_evidence.CHECKPOINT
+    checkpoint = tmp_path / HISTORICAL_CHECKPOINT
     save(checkpoint / "run.json", {"status": "passed", "optimization_calls": 0})
     run = tmp_path / "artifacts/full/test"
     save(run / "run.json", {"provenance": original, "fits": [
@@ -95,7 +97,7 @@ def test_exact_inventory_members_cached_dependencies_and_source_provenance(fixtu
     assert "artifacts/milestone3/repaired/native.pkl" in names
     assert "artifacts/milestone4/seed101/fits/B_S0/result.json" in names
     assert "artifacts/milestone6/seed101/run.json" in names
-    assert f"{archive_evidence.CHECKPOINT.as_posix()}/run.json" in names
+    assert f"{HISTORICAL_CHECKPOINT.as_posix()}/run.json" not in names
     assert "artifacts/curation/current/summary.json" in names
     assert "artifacts/archives/test_source/provenance.json" in names
     assert "artifacts/archives/test.json" not in names
@@ -112,6 +114,30 @@ def test_exact_inventory_members_cached_dependencies_and_source_provenance(fixtu
             assert member.uid == member.gid == 0 and member.uname == member.gname == ""
             assert member.mtime == 0
             assert hashlib.sha256(stream.extractfile(member).read()).hexdigest() == item["sha256"]
+
+
+def test_fresh_full_run_archives_without_any_historical_milestones(fixture):
+    # Fresh full evidence has no cached parents and must not require any
+    # ignored local checkpoint from the author's earlier experiment.
+    for milestone in (3, 4, 5, 6):
+        shutil.rmtree(fixture["root"] / f"artifacts/milestone{milestone}")
+    run_path = fixture["run"] / "run.json"
+    source = json.loads(run_path.read_text())
+    source["fits"] = [{"seed": 101, "reused": False, "source_result": None}]
+    save(run_path, source)
+    result = create(fixture, includes=[])
+    assert result["status"] == "verified"
+    assert result["cached_dependency_runs"] == []
+    assert result["source_seeds"] == [101]
+    assert result["verification"]["member_count"] == 3
+    assert not any("milestone" in row["path"] for row in result["inventory"])
+
+
+def test_historical_checkpoint_is_archived_only_when_explicitly_included(fixture):
+    checkpoint = fixture["root"] / HISTORICAL_CHECKPOINT
+    result = create(fixture, includes=[fixture["extra"], checkpoint])
+    assert result["status"] == "verified"
+    assert f"{HISTORICAL_CHECKPOINT.as_posix()}/run.json" in {row["path"] for row in result["inventory"]}
 
 
 @pytest.mark.parametrize("key", ("output", "manifest"))

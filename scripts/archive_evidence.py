@@ -26,7 +26,6 @@ from mujoco_sysid_lab.provenance import collect_provenance, sha256_file, snapsho
 
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = "mujoco-sysid-lab.evidence-archive.v1"
-CHECKPOINT = Path("artifacts/milestone5/20261013_seed101")
 FORBIDDEN_PARTS = frozenset({"private", ".venv", ".git", "__pycache__", ".pytest_cache"})
 
 
@@ -178,8 +177,6 @@ def collect_inputs(root: Path, run: Path | str, includes: Sequence[Path | str]) 
                 seen.add(parent)
                 roots.add(parent)
                 pending.append(parent)
-    checkpoint = _artifact_path(root, CHECKPOINT, must_exist=True)
-    roots.add(checkpoint)
     for extra in includes:
         roots.add(_artifact_path(root, extra, must_exist=True))
     return sorted(roots), sorted(dependencies, key=lambda item: item["path"]), record

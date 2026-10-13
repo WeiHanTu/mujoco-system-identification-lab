@@ -2,14 +2,15 @@
 
 Project: `mujoco-system-identification-lab`.
 Remote supplied by the user: `https://github.com/WeiHanTu/mujoco-system-identification-lab.git` (local origin).
-Status: Milestones 4–9 authorized; verify each checkpoint and continue through project completion.
+Status: Milestones 1–9 complete and locally verified; repository polish is authorized by the user's subsequent request.
 Planning date: 2026-10-12, America/Los_Angeles.
 
 ## Working style and authorization
 
 - Be direct and ruthless. Do not sugarcoat problems or agree for the sake of it.
 - Read this file, `intend.md`, `spec.md`, and `plan.md` before making changes.
-- This is an independent project under `/Users/weihantu/mujoco-lab/mujoco-system-identification-lab`. Never add its implementation to `sensor-fusion-replay-cpp`.
+- This repository is the independent `mujoco-system-identification-lab` project. Never add its implementation to `sensor-fusion-replay-cpp`.
+- Repository polish may improve documentation, package metadata, and contributor workflows. Preserve frozen scientific configuration, raw results, prior archives, and the exact provenance of existing evidence. Do not grant a license without the owner's explicit choice.
 - The user approved the plan on 2026-10-12, authorized Milestones 2–4, and on 2026-10-13 explicitly approved all remaining work through Milestone 9. Verify every milestone before advancing, but do not pause for another approval. Scope includes joint recovery, held-out evaluation, delay, all seeds/starts, mismatch, final tests/CI configuration/documentation, and ignored interview notes.
 - After each numbered milestone, verify its gate and report evidence and failures. The user's approval of all remaining milestones supersedes the earlier wait-for-continuation requirement; correctness and scientific prerequisites still apply.
 - The user supplied the existing GitHub repository and authorized connecting it as local origin. No upload, publication, or messages to other people are authorized by the planning request or by supplying the remote alone.

@@ -1,6 +1,6 @@
 # Execution plan
 
-Status: Milestones 1–8 are verified. All 82 registered fits are retained; Milestone 9 curation, final tests, browser verification, and evidence audit passed. The user approved all remaining milestones on 2026-10-13.
+Status: Milestones 1–9 are verified. All 82 registered fits, final tests, browser verification, and evidence archive passed. Post-milestone repository polish is authorized by the user. The user approved all remaining milestones on 2026-10-13.
 
 ## Current checkpoint
 
