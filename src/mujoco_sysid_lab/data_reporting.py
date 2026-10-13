@@ -52,7 +52,11 @@ def evaluate_baselines(dataset: Dataset, study: StudyConfig) -> dict:
         "noise_diagnostics": noise_diagnostics,
         "identified_model": {"value": None, "reason": "Identification begins at Milestone 3."},
         "oracle_semantics": "Matched generator-consistent physical parameters; residual contains measurement noise.",
-        "metrics_units": {"qpos_rmse": "rad", "qvel_rmse": "rad/s", "normalized_rmse": "dimensionless"},
+        "metrics_units": {
+            "qpos_rmse": "rad", "qvel_rmse": "rad/s", "normalized_rmse": "dimensionless",
+            "qpos_p95_absolute_error": "rad", "qvel_p95_absolute_error": "rad/s",
+        },
+        "registered_metric_field_map": {"noise_normalized_rmse": "normalized_rmse"},
         "primary_success_criteria_evaluated": False,
     }
 
@@ -76,7 +80,7 @@ def write_baseline_table(path: Path, diagnostics: dict, provenance: dict, seed: 
 
 
 def generate_plots(directory: Path, dataset: Dataset, study: StudyConfig) -> dict:
-    """Plot stored measurements and baselines; there are no identified curves."""
+    """Plot stored baselines; descriptor paths are relative to directory.parent."""
     import matplotlib
     matplotlib.use("Agg")
     from matplotlib import pyplot as plt
@@ -156,5 +160,5 @@ def generate_plots(directory: Path, dataset: Dataset, study: StudyConfig) -> dic
     figure.savefig(path, dpi=150)
     plt.close(figure)
     paths["measurement_noise"] = path
-    return {name: {"path": path.name, "sha256": sha256_file(path)}
+    return {name: {"path": path.relative_to(directory.parent).as_posix(), "sha256": sha256_file(path)}
             for name, path in paths.items()}

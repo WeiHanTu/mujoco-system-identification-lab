@@ -6,9 +6,10 @@ from types import MappingProxyType
 
 import pytest
 
-from mujoco_sysid_lab.data_reporting import evaluate_baselines
+from mujoco_sysid_lab.data_reporting import evaluate_baselines, generate_plots
 from mujoco_sysid_lab.dataset import TrajectoryRecord, generate_dataset
 from mujoco_sysid_lab.experiment_config import load_ground_truth, load_study_config
+from mujoco_sysid_lab.provenance import sha256_file
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -29,6 +30,9 @@ def test_report_labels_only_unfitted_baselines_and_retains_per_trajectory_metric
     assert all(row["n_samples"] == 3941 for row in report["trajectory_metrics"])
     assert report["identified_model"]["value"] is None
     assert report["primary_success_criteria_evaluated"] is False
+    aliases = report["registered_metric_field_map"]
+    assert all(aliases.get(name, name) in report["metrics_units"]
+               for name in study.metrics["per_trajectory"])
     for split in report["split_metrics"].values():
         for baseline in split.values():
             assert baseline["trajectory_count"] == 2
@@ -46,3 +50,14 @@ def test_heldout_measurement_changes_cannot_change_training_statistics(inputs):
     after = evaluate_baselines(replace(dataset, records=MappingProxyType(records)), study)
     assert after["split_metrics"]["train"] == before["split_metrics"]["train"]
     assert after["split_metrics"]["heldout"] != before["split_metrics"]["heldout"]
+
+
+def test_plot_descriptors_resolve_relative_to_run_directory(inputs, tmp_path):
+    study, dataset = inputs
+    descriptors = generate_plots(tmp_path / "plots", dataset, study)
+    assert len(descriptors) == 4
+    for descriptor in descriptors.values():
+        assert descriptor["path"].startswith("plots/")
+        image = tmp_path / descriptor["path"]
+        assert image.is_file()
+        assert sha256_file(image) == descriptor["sha256"]
