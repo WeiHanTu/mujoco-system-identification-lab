@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mujoco-system-identification-lab"
+version = "0.1.0"
+description = "A reproducible synthetic MuJoCo dynamics identification study"
+requires-python = ">=3.12.5,<3.13"
+dependencies = [
+  "mujoco[sysid]==3.15.0",
+  "numpy==2.3.3",
+  "scipy==1.16.2",
+  "matplotlib==3.10.6",
+]
+
+[dependency-groups]
+dev = ["pytest==8.4.2"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

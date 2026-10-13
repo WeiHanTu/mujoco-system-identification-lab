@@ -1,0 +1,21 @@
+<mujoco model="authored_1dof_pendulum">
+  <compiler angle="radian" inertiafromgeom="false"/>
+  <option timestep="0.002" integrator="implicitfast" gravity="0 0 -9.81"/>
+  <worldbody>
+    <body name="link" pos="0 0 0">
+      <joint name="hinge" type="hinge" axis="0 1 0" damping="0.15"
+             armature="0" frictionloss="0" limited="false"/>
+      <inertial pos="0 0 -0.25" mass="1.2"
+                diaginertia="0.0250675 0.0250675 0.000135"/>
+      <geom name="link_geometry" type="cylinder" pos="0 0 -0.25"
+            size="0.015 0.25" contype="0" conaffinity="0" rgba="0.25 0.55 0.85 1"/>
+    </body>
+  </worldbody>
+  <actuator>
+    <motor name="torque" joint="hinge" gear="1" ctrllimited="false"/>
+  </actuator>
+  <sensor>
+    <jointpos name="qpos" joint="hinge"/>
+    <jointvel name="qvel" joint="hinge"/>
+  </sensor>
+</mujoco>
