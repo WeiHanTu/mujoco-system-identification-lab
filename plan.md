@@ -1,10 +1,10 @@
 # Execution plan
 
-Status: Milestone 1 is complete and verified; Milestone 2 is authorized and in progress. Stop before Milestone 3.
+Status: Milestones 1 and 2 are complete and verified. Stop before Milestone 3.
 
 ## Current checkpoint
 
-Workspace and available instructions inspected. Four requested planning files created in an independent project directory. Milestone 1 installed MuJoCo 3.15.0, verified official SysID imports/contracts, and retained an audited deterministic simulation. Milestone 2 now implements the registered training/held-out synthetic dataset and shared baseline evaluation; identification has not started.
+Workspace and available instructions inspected. Four requested planning files created in an independent project directory. Milestone 1 installed MuJoCo 3.15.0, verified official SysID imports/contracts, and retained an audited deterministic simulation. Milestone 2 verified four complete noisy synthetic trajectories, repeat/IO determinism, isolated training reads, shared nominal/oracle metrics, and inspected plots. Its clean source run completed in 1.2901 s; 270 local tests passed. The exact evidence/truth configuration hashes and all 82 future fits are frozen in docs/results/registration_v1.json. Identification has not started. See docs/milestones/02_synthetic_data.md and docs/results/milestone2.json.
 
 The user supplied `https://github.com/WeiHanTu/mujoco-system-identification-lab.git`. A read-only Git check found no advertised branches or tags; the existing local repository is connected to it as origin. The user subsequently approved the plan and authorized Milestone 1. No remote publication has been requested.
 

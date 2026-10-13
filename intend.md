@@ -1,7 +1,7 @@
 # Intent and claim boundaries
 
 Project: `mujoco-system-identification-lab`.
-Status: approved plan; Milestone 2 is in progress. No identified-model recovery or held-out improvement claims exist yet.
+Status: Milestones 1 and 2 are verified. Deterministic matched-model data and nominal/oracle baselines exist; no identified-model recovery or held-out improvement claims exist yet.
 
 ## Intended result
 
