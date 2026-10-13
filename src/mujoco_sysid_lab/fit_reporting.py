@@ -228,6 +228,46 @@ def _copy_build_model(params: Any, spec: mujoco.MjSpec) -> mujoco.MjModel:
     return sysid.apply_param_modifiers(params, spec.copy())
 
 
+_SERIALIZED_FIELDS = ("body_mass", "body_inertia", "body_ipos", "dof_damping", "dof_dampingpoly")
+
+
+def _verify_serialized_model(saved: mujoco.MjModel, expected: mujoco.MjModel) -> dict:
+    """Check official XML against its runtime-probed six-digit serialization.
+
+    Installed 3.15 MjSpec.compile()->to_xml probes verified six significant
+    digits for mass, COM inertia, and damping, including rounding boundaries.
+    This is a file-format check, not a change to physical recovery thresholds.
+    """
+    fields = {}
+    for field in _SERIALIZED_FIELDS:
+        full_precision = getattr(expected, field)
+        quantized = np.array([float(format(float(value), ".6g"))
+                              for value in full_precision.flat]).reshape(full_precision.shape)
+        actual = getattr(saved, field)
+        np.testing.assert_allclose(actual, quantized, rtol=1e-12, atol=1e-12)
+        nonzero = full_precision != 0
+        maximum_relative_error = (float(np.max(np.abs((actual[nonzero]-full_precision[nonzero])
+                                                      / full_precision[nonzero])))
+                                  if nonzero.any() else None)
+        fields[field] = {
+            "full_precision_candidate": full_precision.tolist(),
+            "serialized_target": quantized.tolist(),
+            "compiled_xml_value": actual.tolist(),
+            "maximum_absolute_serialization_error": float(np.max(np.abs(actual-full_precision))),
+            "maximum_relative_serialization_error": maximum_relative_error,
+            "relative_error_reason": None if nonzero.any() else "All field values are zero; relative error is undefined.",
+        }
+    return {
+        "saved_xml_matches_serialized_optimized_mass_inertia_damping": True,
+        "comparison_target": "fitted model fields serialized to six significant decimal digits",
+        "format": "six significant digits; float(format(value,'.6g'))",
+        "verification_basis": "Installed MuJoCo 3.15.0 runtime probes across six fixtures including rounding boundaries",
+        "comparison_tolerance": {"rtol": 1e-12, "atol": 1e-12},
+        "scientific_thresholds_changed": False,
+        "fields": fields,
+    }
+
+
 def save_official_fit(directory: Path, problem: Any, execution: Any, *,
                       title: str = "Synthetic oracle-assisted SysID", noiseless: bool = False) -> dict:
     """Save official raw results, correctly stamped XML, and official HTML.
@@ -260,10 +300,20 @@ def save_official_fit(directory: Path, problem: Any, execution: Any, *,
         path = output / f"{group.name}.xml"
         saved = mujoco.MjModel.from_xml_path(str(path))
         expected = group.spec.compile()
-        for field in ("body_mass", "body_inertia", "body_ipos", "dof_damping", "dof_dampingpoly"):
-            np.testing.assert_allclose(getattr(saved, field), getattr(expected, field), rtol=1e-12, atol=1e-12)
-        verification[group.name] = {"saved_xml_matches_optimized_mass_inertia_damping": True,
+        verification[group.name] = {**_verify_serialized_model(saved, expected),
                                     "path": path.name, "sha256": sha256_file(path)}
+        # The official XML writer rounds decimal fields. Preserve a separate
+        # full-precision compiled model through MuJoCo's official binary API.
+        binary_path = output / f"{group.name}.mjb"
+        mujoco.mj_saveModel(expected, str(binary_path))
+        binary = mujoco.MjModel.from_binary_path(str(binary_path))
+        for field in _SERIALIZED_FIELDS:
+            np.testing.assert_array_equal(getattr(binary, field), getattr(expected, field))
+        verification[group.name]["full_precision_binary"] = {
+            "path": binary_path.name, "sha256": sha256_file(binary_path),
+            "saved_binary_fields_exactly_equal_to_full_precision_candidate": True,
+            "api": "mujoco.mj_saveModel and MjModel.from_binary_path",
+        }
     rb = sysid.default_report(groups, problem.params, execution.optimized_params,
                               problem.residual_fn, execution.optimize_result,
                               title=title, save_path=None, build_model=_copy_build_model,
@@ -282,6 +332,7 @@ def save_official_fit(directory: Path, problem: Any, execution: Any, *,
             "The official parameter error table compares against the starting reference, not hidden ground truth. "
             "Project fit summary truth errors and bound hits (0.001 times bound width) are authoritative; upstream bound styling uses a different rule. "
             "Optimization trace entries include initial, callback, and final evaluations; the upstream Iteration label does not establish an iteration count. "
+            "Official XML rounds physical fields to six significant digits; full-precision estimates remain in parameter YAML, optimizer pickle, and the separately saved MuJoCo MJB model. "
             + interval_note
         ),
     ))
@@ -297,5 +348,8 @@ def save_official_fit(directory: Path, problem: Any, execution: Any, *,
             "verified_xml": verification, "original_spec_unchanged": True,
             "reporting_call_counts": reporting_counts,
             "reporting_count_basis": "Additional residual evaluations by official save_results/default_report; excluded from optimizer snapshots.",
+            "parameter_precision": {"official_xml_significant_digits": 6,
+                                    "full_precision_files": ["params_x_hat.yaml", "results.pkl", *[f"{group.name}.mjb" for group in groups]],
+                                    "scientific_thresholds_changed": False},
             "html_renderer": "mujoco.sysid.default_report and public ReportBuilder.add_section/save",
             "videos_generated": False}

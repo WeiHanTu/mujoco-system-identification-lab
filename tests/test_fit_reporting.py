@@ -12,7 +12,7 @@ from scipy.optimize import OptimizeResult
 
 from mujoco_sysid_lab.dataset import TrainingDataset, TrainingSequence
 from mujoco_sysid_lab.experiment_config import load_ground_truth, load_study_config
-from mujoco_sysid_lab.fit_reporting import save_official_fit, summarize_fit
+from mujoco_sysid_lab.fit_reporting import _verify_serialized_model, save_official_fit, summarize_fit
 from mujoco_sysid_lab.identification import build_problem
 from mujoco_sysid_lab.provenance import sha256_file
 from mujoco_sysid_lab.simulation import compile_model, simulate
@@ -186,7 +186,7 @@ def test_actual_official_save_report_and_xml_use_fitted_values_on_copies(tmp_pat
     assert info["videos_generated"] is False
     assert info["reporting_call_counts"]["residual_calls"] == 3
     assert execution.call_counts == saved_counts and problem.spec.to_xml() == source_xml
-    assert set(info["files"]) == {"params_x_0.yaml", "params_x_hat.yaml", "results.pkl", "confidence.pkl", "pendulum.xml", "report.html"}
+    assert set(info["files"]) == {"params_x_0.yaml", "params_x_hat.yaml", "results.pkl", "confidence.pkl", "pendulum.xml", "pendulum.mjb", "report.html"}
     for descriptor in info["files"].values():
         assert sha256_file(output / descriptor["path"]) == descriptor["sha256"]
     saved = mujoco.MjModel.from_xml_path(str(output / "pendulum.xml"))
@@ -199,6 +199,7 @@ def test_actual_official_save_report_and_xml_use_fitted_values_on_copies(tmp_pat
     assert "Project interpretation and claim boundaries" in html
     assert "means measured signals" in html and "starting reference, not hidden ground truth" in html
     assert "not statistical confidence" in html
+    assert "six significant digits" in html
     assert "Optimization Trace" in html
     assert not list(output.glob("*.mp4"))
     with pytest.raises(ValueError, match="Output already exists"):
@@ -214,3 +215,62 @@ def test_actual_single_parameter_summary_retains_numerical_recovery_and_trace(re
     assert summary["objective_trace"][-1]["event"] == "final"
     assert summary["optimizer"]["nit"] is None
     json.dumps(summary, allow_nan=False)
+
+
+@pytest.mark.parametrize("mass,damping,expected_mass,expected_damping", [
+    (0.432198765, 0.00123456789, 0.432199, 0.00123457),
+    (0.799999999, 0.04000001234, 0.8, 0.04),
+    (1.1998996613593147, 0.15002534185652405, 1.1999, 0.150025),
+    (1.876543219, 0.499999999, 1.87654, 0.5),
+    (1.234565, 0.1234565, 1.23456, 0.123456),
+    (1.234575, 0.1234575, 1.23457, 0.123457),
+])
+def test_installed_xml_serialization_precision_against_literal_probe_values(tmp_path, mass, damping, expected_mass, expected_damping):
+    """Format fixtures verify serialized candidates without any optimizer."""
+    study = load_study_config(ROOT / "configs/evidence_v1.json")
+    from mujoco_sysid_lab.simulation import load_spec
+    spec = load_spec(ROOT / "model/pendulum.xml",
+                     replace(study.nominal, mass_kg=mass, damping_nm_s_per_rad=damping))
+    full_precision = spec.compile()
+    path = tmp_path / "serialized.xml"
+    spec.to_file(str(path))
+    saved = mujoco.MjModel.from_xml_path(str(path))
+    assert saved.body_mass[1] == expected_mass
+    assert saved.dof_damping[0] == expected_damping
+    verified = _verify_serialized_model(saved, full_precision)
+    assert verified["comparison_tolerance"] == {"rtol": 1e-12, "atol": 1e-12}
+    assert verified["scientific_thresholds_changed"] is False
+    assert verified["fields"]["body_mass"]["maximum_absolute_serialization_error"] == abs(mass-expected_mass)
+    json.dumps(verified, allow_nan=False)
+
+
+def test_serialized_verification_rejects_stale_initial_model(tmp_path):
+    study = load_study_config(ROOT / "configs/evidence_v1.json")
+    initial = compile_model(ROOT / "model/pendulum.xml", study.nominal)
+    fitted = compile_model(ROOT / "model/pendulum.xml", replace(study.nominal, mass_kg=1.1998996613593147))
+    with pytest.raises(AssertionError):
+        _verify_serialized_model(initial, fitted)
+
+
+def test_official_saver_preserves_full_precision_for_non_six_digit_candidate(tmp_path, reduced_single_parameter_fit):
+    """Serialization-only fixture; the supplied candidate is not a fitted result."""
+    problem, _ = reduced_single_parameter_fit
+    candidate = problem.params.copy()
+    exact_mass = 1.1998996613593147
+    candidate.update_from_vector(np.array([exact_mass]))
+    residual = problem.evaluate(np.array([exact_mass]))
+    execution = SimpleNamespace(
+        optimized_params=candidate,
+        optimize_result=OptimizeResult(x=np.array([exact_mass]), jac=np.ones((residual.size, 1))),
+    )
+    output = tmp_path / "serialization_fixture"
+    info = save_official_fit(output, problem, execution, title="Serialization fixture; not an optimization result")
+    saved_xml = mujoco.MjModel.from_xml_path(str(output / "pendulum.xml"))
+    saved_binary = mujoco.MjModel.from_binary_path(str(output / "pendulum.mjb"))
+    assert saved_xml.body_mass[1] == 1.1999
+    assert saved_binary.body_mass[1] == exact_mass
+    fields = info["verified_xml"]["pendulum"]["fields"]
+    assert fields["body_mass"]["maximum_absolute_serialization_error"] == abs(exact_mass-1.1999)
+    assert fields["body_mass"]["maximum_relative_serialization_error"] == abs(exact_mass-1.1999)/exact_mass
+    assert info["parameter_precision"]["scientific_thresholds_changed"] is False
+    assert "pendulum.mjb" in info["parameter_precision"]["full_precision_files"]
