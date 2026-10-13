@@ -26,4 +26,10 @@ The tests and replay took 58.36 s together. This is a verification runtime, sepa
 
 The public overview was produced without simulation or optimization from clean commit `0feff70`. The original evidence used clean commit `ec50b46`; its full run and detailed summary hashes remain unchanged. Local package builds validate packaging, not publication to a package index. Private bilingual interview notes remain Git-ignored. A license awaits an explicit owner choice.
 
+## Durable local evidence
+
+The subsequent archive is `artifacts/archives/20261013_professional_verified.tar.gz`, 166,899,487 bytes, SHA256 `0f3c822030bbc5a550c631641b7348127dd865b57d18ca7952beb18c0532f783`. All 1,599 regular member sizes and hashes passed verification after reopening. [professional_archive.json](results/professional_archive.json) retains its exact command, complete inventory, cached dependencies, and clean producer commit `0a2b6f0`.
+
+It preserves the original scientific runs and failures, final verification logs, overview producer, package verification, and a verified Git source-history bundle through `0a2b6f0`. The bundle includes the historical source commits needed to reconstruct the retained runs. The later commit publishing this archive inventory is outside the bundle. The original Milestone 9 archive remains unchanged. Archives and source history stay local; no upload or repository publication has occurred.
+
 This remains synthetic workflow verification. It establishes no real-robot validation, HIL, physical calibration, contact-rich manipulation, real sim-to-real transfer, production deployment, or general parameter identifiability.
