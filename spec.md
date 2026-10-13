@@ -1,6 +1,6 @@
 # Proposed experimental specification v0.1
 
-Status: user approved v0.1 on 2026-10-12; Milestones 1 and 2 are verified. The full specification is frozen in configs/evidence_v1.json and docs/results/registration_v1.json before identification. Physical recovery and held-out improvement targets below remain registered proposals, not measured identification results. No outcome-driven revision is allowed.
+Status: user approved v0.1 on 2026-10-12; Milestones 1–3 are verified. The full specification was frozen in configs/evidence_v1.json and docs/results/registration_v1.json before identification. Independent oracle-assisted A1/A2 recovery is measured for seed 101; joint/multi-seed recovery and held-out improvement targets below remain unverified. No outcome-driven revision is allowed.
 
 Milestone 2 retained seed-101 matched data and nominal/oracle baselines with unchanged physical values, excitation, noise, bounds, starts, and criteria. Evidence config SHA256: f3e6deacceec9e6365b39e2c9067b9e3a8b71bab6a1c21f6f8e6ada4af824202; truth config SHA256: 07c0aac32fe4147921572fdf3e8b134e49c991daa3468de27badb55ce9ef0f2f. The registered per-trajectory label `noise_normalized_rmse` maps explicitly to the output field `normalized_rmse`; its equation and weights are unchanged. Curated results and the retained metadata-audit correction are in docs/results/milestone2.json.
 

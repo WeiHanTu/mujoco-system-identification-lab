@@ -2,7 +2,44 @@
 
 A reproducible synthetic dynamics system-identification study that exercises the estimation, validation, and diagnostic workflow needed before applying the method to real traces.
 
-Completed: Milestone 2 deterministic synthetic datasets and nominal/oracle baselines. Four complete eight-second trajectories contain 4,001 samples each. The retained run uses noise seed 101; the local suite passed 270 tests. No identification has run, so parameter recovery and fitted held-out prediction remain unverified.
+Completed: Milestone 3 independent mass and damping recovery with MuJoCo's official SysID toolbox. On noise seed 101, mass error was **0.00836%** and damping error was **0.01689%**. Each fit was oracle-assisted: the other physical parameter was fixed to its true value. This verifies the individual parameter paths; joint recovery and identified-model held-out improvement remain unverified. The local suite passed **326 tests**.
+
+| Oracle-assisted fit | Start | True value | Recovered value | Relative error | Bound hit |
+|---|---:|---:|---:|---:|---|
+| Mass; true damping fixed | 0.80 kg | 1.20 kg | 1.199899661 kg | 0.00836% | No |
+| Damping; true mass fixed | 0.04 N*m*s/rad | 0.15 N*m*s/rad | 0.150025342 N*m*s/rad | 0.01689% | No |
+
+![Independent physical parameter recovery](docs/images/milestone3_parameter_recovery.png)
+
+[Milestone 3 verification](docs/milestones/03_single_parameter_recovery.md) · [Machine-readable evidence](docs/results/milestone3.json) · [Parameter rows](docs/results/milestone3_parameter_table.csv) · Official reports: [mass](docs/reports/milestone3/A1/report.html), [damping](docs/reports/milestone3/A2/report.html)
+
+Two registered evidence fits out of 82 are complete, alongside two separately labeled noiseless sanity checks. All four used the complete multisine and piecewise-constant training trajectories. The chirp and pulse trajectories did not enter fitting or fitted-model scoring at this milestone.
+
+## Reproduce Milestone 3
+
+Run from the repository root:
+
+```sh
+uv sync --locked --python 3.12.5
+.venv/bin/python scripts/run_experiment.py --config configs/evidence_v1.json --milestone 3
+.venv/bin/python -m pytest
+```
+
+Leave `--output` unset so the runner creates a fresh UTC-timestamped directory under `artifacts/milestone3/`. Existing evidence directories are rejected. This command runs the two independent noisy fits and two noiseless checks, saves native results, and generates official HTML with videos disabled. It does not run the remaining milestones.
+
+The noisy fits reduced the training objective from 15,888,124 to 7,906.17 for mass and from 25,239,640 to 7,906.11 for damping. The objective is `0.5*sum(noise_normalized_residual**2)` over 15,764 residual entries. Training noise-normalized RMSE was 1.00153 for both fitted unit models, close to the matched oracle's 1.00157. These are training diagnostics; the study's primary held-out target has not been assessed.
+
+Both noisy fits converged: mass terminated on `ftol` and `xtol`, damping on `ftol`. Each recorded seven native function evaluations, seven Jacobian evaluations, and six callback events. SciPy does not expose an iteration count here; callback events are reported separately. The noiseless checks recovered mass and damping to relative errors 4.07e-15 and 7.40e-16, below the unchanged 0.1% numerical sanity threshold.
+
+The original optimization batch used clean source `5550a43b1d36f0be1820e1f9c3d39b2eabdc1bda` and took 2.179117 s. Its noisy fits converged, but report verification failed because official XML rounds physical fields to six significant digits. That failure remains retained. A separate clean-source report repair at `363241a960ed702d481e4ad58e103ac943341245` took 1.259173 s, reused all four native optimization results, and reproduced their summaries exactly without rerunning optimization. These runtimes describe separate invocations.
+
+XML verification now compares to the verified six-digit serialization target at unchanged `rtol=atol=1e-12`. Full-precision estimates remain in parameter YAML and optimizer pickle; an official MuJoCo MJB model preserves the compiled physical fields exactly. Parameter estimates, configs, and scientific thresholds did not change. Raw initial and repaired runs, all four reports, logs, arrays, and source provenance are archived locally in ignored `artifacts/milestone3/20261012_evidence_verified.tar.gz`; its actual hash and archive command are in [milestone3.json](docs/results/milestone3.json).
+
+The environment remains Python 3.12.5, MuJoCo 3.15.0, macOS 26.6.2, Apple M4 Pro (12 cores, 24 GB), one rollout worker, and one numerical-library thread. The final local suite passed 326 tests in 4.47 s with 148 upstream deprecation warnings visible. Remote CI and full-study runtime remain unverified.
+
+Milestone 3 passed. Stop before Milestone 4 joint mass/damping recovery.
+
+## Deterministic synthetic data
 
 ![Training measurements and nominal/oracle baselines](docs/images/milestone2_training_baselines.png)
 
@@ -39,11 +76,11 @@ Each split aggregates per-trajectory RMSE with equal trajectory weight. The orac
 
 The verified run used clean source commit `fa40206800643ff9e0b44bafed02a036ab47a3a3`, Python 3.12.5, MuJoCo 3.15.0, macOS 26.6.2, and an Apple M4 Pro (12 cores, 24 GB). Generation, repeated-array/metadata checks, NPZ round-trip, metrics, and plots completed in 1.290060 s. The suite passed 270 tests in 4.41 s with 17 upstream deprecation warnings visible. Remote CI has not run; full-study runtime remains unknown.
 
-The evidence config and separate truth config are frozen before the first identification run. Their exact SHA256 values, all 82 proposed fits, five seeds, three starts, delay prerequisites, noise keys, metrics, and unchanged acceptance criteria are in [registration_v1.json](docs/results/registration_v1.json). Only the seed-101 matched dataset is retained at this checkpoint; the 82 fits are future work.
+The evidence config and separate truth config were frozen before the first identification run. Their exact SHA256 values, all 82 registered fits, five seeds, three starts, delay prerequisites, noise keys, metrics, and unchanged acceptance criteria are in [registration_v1.json](docs/results/registration_v1.json). The seed-101 matched dataset supplied the two completed independent evidence fits; the other 80 registered fits remain later work.
 
 Raw evidence is archived locally under ignored `artifacts/milestone2/20261012_evidence_verified.tar.gz`. Its actual hash and creation command are recorded in [milestone2.json](docs/results/milestone2.json). The original run remains retained: its numerical data were valid, but plot paths in its report and the explicit mapping from the registered `noise_normalized_rmse` name to the serialized `normalized_rmse` field needed correction. Regression checks and a new clean-source run corrected those metadata defects without changing configs, numeric data, or thresholds. The first archive is also preserved; the verified archive disables macOS metadata files added by default tar behavior.
 
-Milestone 2 passed. Stop before Milestone 3, which adds the official single-parameter identification pipeline.
+Milestone 2 passed; its retained baseline metrics remain separate from the later oracle-assisted single-parameter results.
 
 ## Reproduce Milestone 1
 
@@ -75,13 +112,17 @@ The verification trajectory has two small torque pulses and runs twice without n
 
 ## Installed SysID integration
 
-The intended estimator uses official MjSpec, bounded ParameterDict, TimeSeries, ModelSequences, build_residual_fn, sysid.optimize, save_results, and default_report. The registered solver is the toolbox's official scipy_parallel_fd backend; it retains MuJoCo rollout/Jacobian evaluation while providing SciPy termination diagnostics.
+The implemented single-parameter estimator uses official MjSpec, bounded ParameterDict, TimeSeries, ModelSequences, build_residual_fn, sysid.optimize, save_results, and default_report. The registered solver is the toolbox's official scipy_parallel_fd backend; it retains MuJoCo rollout/Jacobian evaluation while providing SciPy termination diagnostics.
 
 The released package requires explicit handling of several contracts: frozen physical modifiers are skipped; mass helpers do not scale inertia by default; the default residual adds amplitude scaling; optimizer max_iters maps to a function-evaluation budget; and HTML reporting is separate from save_results. Installed source fingerprints and runtime probes document these behaviors.
 
 For this exact jointpos/jointvel sensor pair, MuJoCo rollout sensor output precedes integration, while the SysID conversion uses post-step state timestamps. A narrow supported modify_residual hook reconstructs these two observations from the returned integration states, with explicit initial observation and a fixed safe delay window. This preserves physical timestamps rather than absorbing a numerical offset into the estimated delay. It is deliberately limited to the authored one-DOF sensor layout.
 
 Pure noise weighting disables the upstream amplitude normalization. The official residual sign is measured minus predicted; scalar least-squares loss and RMSE are unchanged by this sign convention. No alternate optimizer is implemented.
+
+Official report terminology needs care. Its observation legend `nominal` denotes measured observations; its parameter-table errors compare against the starting reference rather than hidden truth. Upstream bound highlighting also differs from this project's rule of 0.001 times bound width. The project fit summaries provide authoritative truth errors and bound hits. A visible interpretation section in each official report explains these distinctions.
+
+The exported uncertainty function is `sysid.calculate_intervals`, not `compute_param_intervals`. Its 95% intervals are local Student-t approximations with estimated residual variance and the other physical parameter treated as known. They require a matched model, independent observation noise, and suitable local sensitivity; they do not establish joint identifiability, robustness across seeds, or real-world confidence. Noiseless checks report statistical intervals as unavailable.
 
 ## Planned evidence
 
@@ -95,7 +136,7 @@ See [spec.md](spec.md) for exact configuration, metrics, thresholds, noise keys,
 
 This project is synthetic workflow validation. The matched generator and fitting model use the same simulator family.
 
-Verified so far: released package imports, inspected/executed API contracts, deterministic CPU simulation and synthetic data generation, mass/inertia consistency, sensor timing/noise-weighting checks, complete-trajectory split isolation, and nominal/oracle baseline metrics on both splits. Synthetic parameter recovery, fitted held-out prediction improvement, excitation/delay/initialization sensitivity, and model-mismatch results require later evidence.
+Verified so far: released package imports, inspected/executed API contracts, deterministic CPU simulation and synthetic data generation, mass/inertia consistency, sensor timing/noise-weighting checks, complete-trajectory split isolation, nominal/oracle baseline metrics on both splits, and independent oracle-assisted physical recovery for seed 101. Joint mass/damping recovery, fitted held-out prediction improvement, excitation/delay/initialization sensitivity, and model-mismatch results require later evidence.
 
 Not demonstrated: real robot data, real-robot validation, hardware-in-the-loop, physical actuator calibration, contact-rich manipulation, real sim-to-real transfer, production deployment, or general parameter identifiability for arbitrary robots.
 

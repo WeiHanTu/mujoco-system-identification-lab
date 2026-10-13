@@ -1,10 +1,10 @@
 # Execution plan
 
-Status: Milestones 1 and 2 are complete and verified; Milestone 3 is authorized and in progress. Stop before Milestone 4.
+Status: Milestones 1–3 are complete and verified. Stop before Milestone 4.
 
 ## Current checkpoint
 
-Workspace and available instructions inspected. Four requested planning files created in an independent project directory. Milestone 1 installed MuJoCo 3.15.0, verified official SysID imports/contracts, and retained an audited deterministic simulation. Milestone 2 verified four complete noisy synthetic trajectories, repeat/IO determinism, isolated training reads, shared nominal/oracle metrics, and inspected plots. Its clean source run completed in 1.2901 s; 270 local tests passed. The exact evidence/truth configuration hashes and all 82 future fits are frozen in docs/results/registration_v1.json. Milestone 3 now implements and tests official single-parameter fitting and saving/reporting; registered identification evidence has not started. See docs/milestones/02_synthetic_data.md and docs/results/milestone2.json.
+Workspace and available instructions inspected. Four requested planning files created in an independent project directory. Milestones 1 and 2 verified MuJoCo 3.15.0, deterministic simulation/data, training isolation, baseline metrics, and frozen registration. Milestone 3 completed the two registered seed-101 oracle-assisted A1/A2 fits plus two separately labeled noiseless checks. Mass = 1.1998996613593147 kg; damping = 0.15002534185652405 N*m*s/rad. The first save audit failed on XML decimal rounding; reports were regenerated from the exact cached optimizer arrays without another optimization. Full-precision MJB and six-digit XML serialization are checked separately. All 326 tests pass; 2/82 registered evidence fits are complete. See docs/milestones/03_single_parameter_recovery.md and docs/results/milestone3.json. Joint recovery and held-out scoring have not started.
 
 The user supplied `https://github.com/WeiHanTu/mujoco-system-identification-lab.git`. A read-only Git check found no advertised branches or tags; the existing local repository is connected to it as origin. The user subsequently approved the plan and authorized Milestone 1. No remote publication has been requested.
 

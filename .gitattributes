@@ -1,2 +1,4 @@
 # Python's CSV writer uses standard CRLF row endings; preserve evidence bytes.
 *.csv whitespace=cr-at-eol
+# Retain official generated HTML byte for byte, including template whitespace.
+docs/reports/** -whitespace

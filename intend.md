@@ -1,7 +1,7 @@
 # Intent and claim boundaries
 
 Project: `mujoco-system-identification-lab`.
-Status: Milestones 1 and 2 are verified. Deterministic matched-model data and nominal/oracle baselines exist; no identified-model recovery or held-out improvement claims exist yet.
+Status: Milestones 1–3 are verified. Deterministic matched-model data, nominal/oracle baselines, and independent oracle-assisted mass/damping recovery checks exist. Joint recovery, fitted held-out improvement, and multi-seed robustness remain unverified.
 
 ## Intended result
 
