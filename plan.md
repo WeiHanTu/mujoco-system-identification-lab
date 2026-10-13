@@ -1,18 +1,18 @@
 # Execution plan
 
-Status: Milestones 1–3 are verified; Milestones 4–9 are authorized. Verify each gate and continue through completion without another approval pause.
+Status: Milestones 1–8 are verified. All 82 registered fits are retained; Milestone 9 curation, final tests, and evidence audit are in progress. The user approved all remaining milestones on 2026-10-13.
 
 ## Current checkpoint
 
-Workspace and available instructions inspected. Four requested planning files created in an independent project directory. Milestones 1 and 2 verified MuJoCo 3.15.0, deterministic simulation/data, training isolation, baseline metrics, and frozen registration. Milestone 3 completed the two registered seed-101 oracle-assisted A1/A2 fits plus two separately labeled noiseless checks. Mass = 1.1998996613593147 kg; damping = 0.15002534185652405 N*m*s/rad. The first save audit failed on XML decimal rounding; reports were regenerated from the exact cached optimizer arrays without another optimization. Full-precision MJB and six-digit XML serialization are checked separately. All 326 tests pass; 2/82 registered evidence fits are complete. See docs/milestones/03_single_parameter_recovery.md and docs/results/milestone3.json. Joint recovery and held-out scoring have not started.
+Milestones 1–3 established deterministic simulation/data, frozen registration, and independent unit recovery. Milestone 4 sealed the seed-101 joint winner before truth evaluation; Milestone 5 scored untouched controls without refitting. Milestone 6 verified delay-only recovery before joint delay estimation. The full matrix then completed all 82 fits, including five seeds and three starts, with no missing rows or bound hits. The step ablation succeeded in this controlled system; the omitted-force fit improved prediction while biasing damping by about 37.5%. The retained full invocation took 57.17 s with 70 new fits and 12 immutable earlier fits reused. See docs/results/summary.json and docs/milestones for exact evidence and limitations.
 
 The user supplied `https://github.com/WeiHanTu/mujoco-system-identification-lab.git`. A read-only Git check found no advertised branches or tags; the existing local repository is connected to it as origin. The user subsequently approved the plan and authorized Milestone 1. No remote publication has been requested.
 
-The proposed dependencies, experiment matrix, acceptance targets, and claim boundaries were shown before approval. Milestone 1 verified released imports/API contracts, deterministic CPU simulation, and provenance. Its local suite passed 86 tests, with upstream warnings retained. See docs/milestones/01_environment.md and docs/results/milestone1.json. The user authorized Milestone 4 with "continue". The frozen configuration remains unchanged; stop before Milestone 5 held-out evaluation.
+The proposed dependencies, experiment matrix, acceptance targets, and claim boundaries were shown before approval. Milestone 1 verified released imports/API contracts, deterministic CPU simulation, and provenance. Its local suite passed 86 tests, with upstream warnings retained. See docs/milestones/01_environment.md and docs/results/milestone1.json. The user subsequently approved all remaining work through Milestone 9. The frozen configuration remains unchanged.
 
 ## Milestone gates
 
-At each milestone, stop execution before the next stage, verify the evidence, and report the gate outcome. Implementation correctness gates must pass. Scientific failures are preserved and explained; they cannot be fixed by changing thresholds or using held-out data. If a dependency or timing API behaves differently from the proposal, report the mismatch and its concrete impact before implementation adapts to it.
+At each milestone, verify the evidence and report the gate outcome before advancing; the current approval authorizes continuing without another permission pause. Implementation correctness gates must pass. Scientific failures are preserved and explained; they cannot be fixed by changing thresholds or using held-out data. If a dependency or timing API behaves differently from the proposal, report the mismatch and its concrete impact before implementation adapts to it.
 
 ### Milestone 1 — Environment and one deterministic simulation
 
@@ -22,7 +22,7 @@ Run the required `import mujoco; from mujoco import sysid`, assert MuJoCo 3.15.0
 
 Author the small MJCF and minimal config/loader/CPU simulation path. Compile MjSpec, verify one hinge/motor/two sensors and parameter/inertia values. Run the same short noiseless trajectory twice. Verify shape, timestamps, finite states, exact initial state, endpoint/control alignment, and reproducibility. Save raw arrays, config, commands, source/environment provenance, and a short milestone record.
 
-Gate: imports/exports/signatures verified, a released official API is usable, deterministic simulation checks pass. CPU profile is recorded. If the installed API disagrees with release documentation, report it before any adapter. Stop and show evidence.
+Gate: imports/exports/signatures verified, a released official API is usable, deterministic simulation checks pass. CPU profile is recorded. If the installed API disagrees with release documentation, report it before any adapter. Verify and show evidence before advancing.
 
 ### Milestone 2 — Synthetic datasets and nominal plots
 
@@ -32,7 +32,7 @@ Plot controls, clean/measured signals, and nominal errors; inspect the plots. Ch
 
 Finalize the accepted configuration and register its hash, exact starts/bounds/metrics/criteria and optimizer options before Milestone 3. Any pre-evidence change must be explicit and justified by correctness or scope, not a wished-for recovery result. Do not create later evidence as if it used earlier settings.
 
-Gate: deterministic dataset contracts and split tests pass; timing/inertia/noise generation audited; all constants are frozen before identification. Stop and show evidence.
+Gate: deterministic dataset contracts and split tests pass; timing/inertia/noise generation audited; all constants are frozen before identification. Verify and show evidence before advancing.
 
 ### Milestone 3 — Independent mass and damping recovery
 
@@ -40,19 +40,19 @@ Build official named TimeSeries, explicit initial state, ModelSequences, noise-w
 
 Run noiseless sanity checks and the two registered seed-101 single-parameter evidence fits. Save objective traces, recovered values, bounds/status/evaluations/runtime, and official reporting artifacts.
 
-Gate: mass/inertia and damping modifiers behave correctly, official pipeline works, no truth/held-out leakage, and noiseless unit recovery succeeds within a declared numerical tolerance (proposed relative error <=0.1%). If noisy recovery is poor, retain it and inspect sensitivity rather than changing acceptance targets. Stop and show evidence.
+Gate: mass/inertia and damping modifiers behave correctly, official pipeline works, no truth/held-out leakage, and noiseless unit recovery succeeds within a declared numerical tolerance (proposed relative error <=0.1%). If noisy recovery is poor, retain it and inspect sensitivity rather than changing acceptance targets. Verify and show evidence before advancing.
 
 ### Milestone 4 — Joint physical recovery
 
 Run all three matched seed-101 joint mass+damping starts with the frozen objective/options. Preserve the nominal-start result and choose the winner using training objective alone. Record its immutable fit ID for the later delay-only stage. Evaluate training predictions for nominal, identified, and oracle. Inspect residuals and scaled sensitivity diagnostics if accessible.
 
-Gate: shared metrics and recorded optimizer objective agree with the registered conventions; results/diagnostics are finite or explicitly unavailable; recovered parameters and limitations are reported. Seed-101 delay-stage eligibility requires both winner physical errors <=10%; a miss is a retained scientific outcome, not permission to change bounds or acceptance criteria. No success criterion is silently adjusted. Stop and show evidence.
+Gate: shared metrics and recorded optimizer objective agree with the registered conventions; results/diagnostics are finite or explicitly unavailable; recovered parameters and limitations are reported. Seed-101 delay-stage eligibility requires both winner physical errors <=10%; a miss is a retained scientific outcome, not permission to change bounds or acceptance criteria. No success criterion is silently adjusted. Verify and show evidence before advancing.
 
 ### Milestone 5 — Held-out prediction
 
 Apply the already-fitted parameters to the untouched chirp/pulse trajectories without refitting. Generate the training/held-out comparisons, p95 errors, noise-normalized RMSE, improvement ratios, and latent-clean diagnostics. Verify all models use the same initialization and common observation window.
 
-Gate: unseen controls never entered optimization or selection, held-out metrics are auditable, and both successes and failures are visible. Freeze no new settings based on these results. Stop and show evidence.
+Gate: unseen controls never entered optimization or selection, held-out metrics are auditable, and both successes and failures are visible. Freeze no new settings based on these results. Verify and show evidence before advancing.
 
 ### Milestone 6 — Sensor delay
 
@@ -60,7 +60,7 @@ Generate target traces with a 0.024 s shared sensor delay and identical register
 
 Run the registered seed-101 physical fits that assume zero delay. Only after delay-only timing correctness and absolute delay error <=0.002 s are verified, run seed-101 joint mass/damping/delay fitting. Distinguish phase correction from physical-parameter compensation and imperfect fixed physics from implementation defects. Use the registered starts; every candidate sees the same residual sample set.
 
-Gate: delay boundary/sign tests pass; delay-only outcome and errors in timesteps are reported; joint delay fitting is either verified or explicitly deferred with its reason. Do not invent completed joint-delay results if the prerequisite fails. Stop and show evidence.
+Gate: delay boundary/sign tests pass; delay-only outcome and errors in timesteps are reported; joint delay fitting is either verified or explicitly deferred with its reason. Do not invent completed joint-delay results if the prerequisite fails. Verify and show evidence before advancing.
 
 ### Milestone 7 — Five seeds, three initializations, weak excitation
 
@@ -68,7 +68,7 @@ Complete the registered matched, weak-step, zero-delay-on-delayed, delay-only, a
 
 Choose each seed's multi-start winner solely by training objective. Save every row, including poor starts, failed convergence, bound hits, and not-run dependencies. Compare weak versus rich excitation with sampled RMS/energy/horizon/reset differences explicit. Aggregate median/min/max and criterion counts, with nominal-start behavior separately reported.
 
-Gate: matrix accounting is complete or explicitly incomplete, all seed/start records retained, no held-out selection, and robustness targets assessed honestly. Stop and show evidence.
+Gate: matrix accounting is complete or explicitly incomplete, all seed/start records retained, no held-out selection, and robustness targets assessed honestly. Verify and show evidence before advancing.
 
 ### Milestone 8 — Model mismatch
 
@@ -76,7 +76,7 @@ Generate targets with the registered smooth Coulomb-like torque, absent from fit
 
 Explain what the actual evidence supports: reduced residual with biased effective parameters is consistent with misspecification. It does not prove structural non-identifiability or excuse uninvestigated optimization failure. If bias or improvement is small, publish that outcome instead of tuning the omitted torque to create a story.
 
-Gate: model separation is tested, all 15 mismatch fits retained or marked failed, oracle meanings explicit, and claims match observed evidence. Stop and show evidence.
+Gate: model separation is tested, all 15 mismatch fits retained or marked failed, oracle meanings explicit, and claims match observed evidence. Verify and show evidence before advancing.
 
 ### Milestone 9 — Documentation, report, tests, evidence audit
 

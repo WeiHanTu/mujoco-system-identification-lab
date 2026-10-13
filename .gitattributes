@@ -2,3 +2,4 @@
 *.csv whitespace=cr-at-eol
 # Retain official generated HTML byte for byte, including template whitespace.
 docs/reports/** -whitespace
+docs/report.html -whitespace

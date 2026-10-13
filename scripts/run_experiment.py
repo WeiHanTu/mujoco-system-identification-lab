@@ -100,8 +100,20 @@ def main() -> int:
     if args.milestone >= 6:
         from mujoco_sysid_lab.study_runner import run_study
         try:
-            return run_study(ROOT, args, output, through=args.milestone)
+            status = run_study(ROOT, args, output, through=args.milestone)
+            if status == 0 and args.milestone == 9:
+                from mujoco_sysid_lab.final_reporting import curate_results
+                curate_results(ROOT, output / "run.json", output / "curation",
+                               [".venv/bin/python", "scripts/run_experiment.py", *sys.argv[1:]])
+                print(f"Public results and figures generated from {output.relative_to(ROOT)}")
+            return status
         except (ValueError, OSError, KeyError) as error:
+            if output.is_dir():
+                from mujoco_sysid_lab.provenance import write_json
+                write_json(output / "orchestration_failure.json", {
+                    "type": type(error).__name__, "message": str(error),
+                    "evidence_preserved": True,
+                })
             parser.error(str(error))
 
     import numpy as np
