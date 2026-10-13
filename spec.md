@@ -1,6 +1,6 @@
 # Proposed experimental specification v0.1
 
-Status: user approved v0.1 on 2026-10-12; installed-API verification is in progress. Values below are registered proposals, not measured results. Serialize this specification into versioned JSON configs before the first identification evidence run. No outcome-driven revision is allowed.
+Status: user approved v0.1 on 2026-10-12; Milestone 1 installed-API verification is complete. Physical recovery and held-out targets below are registered proposals, not measured identification results. Serialize the full evidence specification into versioned JSON before the first identification evidence run. No outcome-driven revision is allowed.
 
 ## Environment and dependencies
 
@@ -24,7 +24,7 @@ Proposed exact direct pins:
 | `pytest` | 8.4.2 | Development/test dependency |
 | `setuptools` | 80.9.0 | Pinned project build backend |
 
-These supporting versions are conservative released pins, not claims that they are the newest. PyPI release pages were checked. Resolution and runtime compatibility remain unverified. Use JSON configs and stdlib parsing; no additional configuration framework. Generate and commit `uv.lock` after approval, covering all transitive SysID extras and wheel hashes. Use `setuptools==80.9.0` in the project build-system requirements. A resolver conflict must be reported and resolved before evidence, rather than silently changing pins.
+These supporting versions are conservative released pins, not claims that they are the newest. PyPI release pages were checked. Milestone 1 resolved and installed 36 locked packages; required imports and deterministic residual/simulation contracts pass. Optimization and official HTML generation remain later milestones. Use JSON configs and stdlib parsing; no additional configuration framework. Committed uv.lock covers transitive runtime SysID extras and wheel hashes; setuptools==80.9.0 is pinned in build-system requirements. A future resolver conflict must be reported rather than silently changing pins.
 
 Official release metadata confirms the `sysid` extra and report template packaging. Read-only inspection of the released CPython 3.12 macOS ARM64 wheel confirmed required export declarations and important sources matching tag 3.15.0. The wheel SHA256 matched PyPI: `18d1b33660c6431ef05398fc576ff1e073ea4119c6e6836f8a113e393d915308`. No package code was imported or installed. Installed import/signature verification is still required:
 

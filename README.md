@@ -2,7 +2,11 @@
 
 A reproducible synthetic dynamics system-identification study that exercises the estimation, validation, and diagnostic workflow needed before applying the method to real traces.
 
-Current scope: Milestone 1 environment, installed API, and deterministic simulation verification. Identification and held-out evaluation are subsequent milestones; no parameter-recovery result is claimed yet.
+Completed: Milestone 1 environment, installed API, and deterministic simulation verification. The local suite passed 86 tests. A one-second trajectory produced 501 finite samples and repeated exactly; the aligned official residual was zero. Identification and held-out evaluation are subsequent milestones; no parameter-recovery result is claimed yet.
+
+![Deterministic synthetic pendulum simulation](docs/images/milestone1_simulation.png)
+
+[Milestone 1 verification](docs/milestones/01_environment.md) · [Machine-readable evidence](docs/results/milestone1.json)
 
 The authored model is a single actuated hinge with a uniform rigid link. Ground-truth mass is 1.20 kg and damping is 0.15 N*m*s/rad; the nominal model starts at 0.80 kg and 0.04 N*m*s/rad. Geometry, COM, gravity, motor gain, and initial state are known. Mass and COM inertia scale together. The timestep is 0.002 s and all rollouts run on CPU.
 
@@ -17,6 +21,10 @@ uv run --locked pytest
 ```
 
 Run from a committed checkout. The verification command refuses to retain results without a real Git commit. It writes a new ignored artifacts/milestone1/<run_id>/ directory containing strict JSON provenance/API checks, raw trajectory NPZ, and a simulation plot. It records dirty state and snapshots dirty authored source. Existing output directories are never overwritten.
+
+The retained evidence run used clean source commit `4ad8657763b7568e1f16d92d3a3808cb739488c9`, Python 3.12.5, MuJoCo 3.15.0, macOS 26.6.2, and an Apple M4 Pro (12 cores, 24 GB). It completed verification in 0.681 s with a warm font cache; the two one-second simulated rollouts took 0.00182 and 0.00173 s. This does not predict full-study runtime. Remote CI has not run.
+
+Raw evidence is archived locally in ignored artifacts/milestone1/20261012_evidence.tar.gz, including the earlier run's retained audit failure. The archive SHA256 and exact creation command are in docs/results/milestone1.json. The first run hashed its still-active console log; a regression test and a new source commit corrected that provenance defect. No physical parameters or acceptance thresholds changed.
 
 The verification trajectory has two small torque pulses and runs twice without noise. The seed is recorded, but this noiseless check uses no randomness. Tests separately cover equilibrium, one-step analytic dynamics, control/sensor timing, inertia scaling, invalid configs/bounds, and provenance. Local determinism does not imply bitwise equality across platforms.
 
@@ -42,7 +50,7 @@ See [spec.md](spec.md) for exact configuration, metrics, thresholds, noise keys,
 
 This project is synthetic workflow validation. The matched generator and fitting model use the same simulator family.
 
-Verified claims are restricted to checks actually recorded at the completed milestone. Synthetic parameter recovery, held-out prediction, excitation/delay/initialization sensitivity, and model-mismatch results require later evidence.
+Verified so far: released package imports, inspected/executed API contracts, deterministic CPU simulation, mass/inertia consistency, and explicit sensor timing/noise-weighting checks. Synthetic parameter recovery, held-out prediction, excitation/delay/initialization sensitivity, and model-mismatch results require later evidence.
 
 Not demonstrated: real robot data, real-robot validation, hardware-in-the-loop, physical actuator calibration, contact-rich manipulation, real sim-to-real transfer, production deployment, or general parameter identifiability for arbitrary robots.
 

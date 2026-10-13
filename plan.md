@@ -1,6 +1,6 @@
 # Execution plan
 
-Status: plan approved on 2026-10-12; Milestone 1 is in progress.
+Status: plan approved on 2026-10-12; Milestone 1 is complete and verified. Stop before Milestone 2.
 
 ## Current checkpoint
 
@@ -8,7 +8,7 @@ Workspace and available instructions inspected. Four requested planning files cr
 
 The user supplied `https://github.com/WeiHanTu/mujoco-system-identification-lab.git`. A read-only Git check found no advertised branches or tags; the existing local repository is connected to it as origin. The user subsequently approved the plan and authorized Milestone 1. No remote publication has been requested.
 
-The proposed dependencies, experiment matrix, acceptance targets, and claim boundaries were shown before approval. Proceed through Milestone 1, then stop for verification and continuation. Later scientific outcomes are not yet demonstrated.
+The proposed dependencies, experiment matrix, acceptance targets, and claim boundaries were shown before approval. Milestone 1 verified released imports/API contracts, deterministic CPU simulation, and provenance. Local suite: 86 passed, 16 upstream deprecation warnings retained. See docs/milestones/01_environment.md and docs/results/milestone1.json. Stop for continuation before Milestone 2. Identification and later scientific outcomes are not yet demonstrated.
 
 ## Milestone gates
 

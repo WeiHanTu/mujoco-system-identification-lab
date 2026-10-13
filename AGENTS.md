@@ -2,7 +2,7 @@
 
 Project: `mujoco-system-identification-lab`.
 Remote supplied by the user: `https://github.com/WeiHanTu/mujoco-system-identification-lab.git` (local origin).
-Status: plan approved; Milestone 1 installation and implementation authorized.
+Status: Milestone 1 complete and verified; stop before Milestone 2 until continuation.
 Planning date: 2026-10-12, America/Los_Angeles.
 
 ## Working style and authorization

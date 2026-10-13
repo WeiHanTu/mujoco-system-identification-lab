@@ -1,0 +1,611 @@
+{
+  "api": {
+    "delay_checks": {
+      "delays_tested_s": [
+        0.0,
+        0.024,
+        0.06
+      ],
+      "fixed_safe_window_s": [
+        0.06,
+        0.94
+      ],
+      "fixture": {
+        "delay_bounds_s": [
+          0.0,
+          0.06
+        ],
+        "qpos": "t",
+        "qvel": "2*t+1",
+        "samples": 501,
+        "timestep_s": 0.002
+      },
+      "monotone_fixture_max_abs_error": 4.440892098500626e-16,
+      "positive_delay_samples_t_minus_delay": true,
+      "safe_query_support_verified": true,
+      "safe_window_candidate_independent": true,
+      "time_series_outside_support_behavior": "constant endpoint padding; disallowed by project hook",
+      "upstream_unwindowed_unsafe_samples_at_max_delay": 30
+    },
+    "finite_difference_checks": {
+      "analytic_jacobian_max_abs_error": 7.450580707946131e-10,
+      "fixture": {
+        "eps": 1.4901161193847656e-08,
+        "lower": [
+          0.4,
+          0.001
+        ],
+        "matrix": [
+          [
+            2.0,
+            3.0
+          ],
+          [
+            -1.0,
+            4.0
+          ],
+          [
+            0.2,
+            -0.3
+          ]
+        ],
+        "point": [
+          0.4,
+          0.5
+        ],
+        "upper": [
+          2.0,
+          0.5
+        ]
+      },
+      "interpretation": "batched Jacobian probe only; no optimizer and no fitted physical parameter",
+      "official_batched_fd_bounds_respected": true,
+      "python_residual_calls": 2,
+      "reported_added_residual_evaluations": 2
+    },
+    "mismatches": [
+      "build_residual_fn docstring uses unsupported signal_transform; use modify_residual=hook",
+      "frozen physical parameter modifiers are skipped; stamp fixed physics in MjSpec",
+      "normalizer docstring says standard deviation; code is column L2 norm / sqrt(2)",
+      "mass helper defaults to scale_rot_inertia=False; explicitly enable fixed-geometry scaling",
+      "positive-delay window lower bound is unsafe without prespecified safe prewindow",
+      "official rollout labels pre-step sensors with post-step times; explicit state observation hook required",
+      "max_iters is SciPy max_nfev, despite iteration language in optimize docstring",
+      "save_results writes raw outputs; HTML is generated separately by default_report"
+    ],
+    "model_compilation": {
+      "model_sha256": "986dc43c33442c9d56785ca16237521c195ffac05341473cd80db8ec764340b7",
+      "source": "load_spec: authored MJCF with exact physical config stamped",
+      "state_spec": "mjSTATE_FULLPHYSICS"
+    },
+    "mujoco_version": "3.15.0",
+    "optimizer_inspection": {
+      "check_conditioning": "optional extra FD Jacobian warning; false by default",
+      "diff_step_semantics": "scalar relative FD scale, multiplied by max(1, abs(x)); bounded batched mujoco.minimize.jacobian_fd",
+      "executed_estimation": false,
+      "iteration_count": {
+        "reason": "SciPy OptimizeResult does not expose a general nit field",
+        "value": null
+      },
+      "max_iters_semantics": "forwarded as scipy max_nfev; not iteration count",
+      "max_nfev_direct_keyword": "do not pass: duplicates wrapper keyword",
+      "native_backend_missing_termination_diagnostics": true,
+      "no_start_movement": "preserve preregistered starts; do not call move_off_bounds implicitly",
+      "planned_backend": "scipy_parallel_fd",
+      "scipy_diagnostics": [
+        "success",
+        "status",
+        "message",
+        "nfev",
+        "njev",
+        "cost",
+        "optimality",
+        "active_mask",
+        "jac"
+      ],
+      "supported_forwarded_options": [
+        "method",
+        "loss",
+        "x_scale",
+        "ftol",
+        "xtol",
+        "gtol",
+        "callback"
+      ],
+      "verbose_semantics": "optimize(verbose=False) disables comparison log, but its argument is not forwarded; upstream SciPy wrapper still defaults to verbosity 2"
+    },
+    "physical_modifier_checks": {
+      "com_unchanged": true,
+      "fixed_physics_policy": "stamp into MjSpec; omit from free ParameterDict",
+      "frozen_physical_modifier_skipped": true,
+      "inertia_ratio_max_abs_error": 0.0,
+      "mass_and_inertia_scaled_together": true,
+      "mjsjoint_damping_shape": [
+        3
+      ]
+    },
+    "pipeline_checks": {
+      "aligned_identity_residual_max_abs": 0.0,
+      "default_normalizer": "column_l2_norm_divided_by_sqrt_2; not standard deviation",
+      "fixed_observation_samples": 141,
+      "hook": "modify_residual: explicit initial observation plus fresh FULLPHYSICS qpos/qvel; SignalTransform(normalize=False)",
+      "n_rollout_threads": 1,
+      "noise_weighted_residual_max_abs_error": 6.938893903907228e-15,
+      "normalizer_fixture": [
+        [
+          1.0,
+          2.0
+        ],
+        [
+          3.0,
+          5.0
+        ],
+        [
+          4.0,
+          9.0
+        ]
+      ],
+      "official_pipeline_executed_without_optimization": true,
+      "probe_controls": {
+        "formula": "0.45*sin(sample_index*0.37)",
+        "shape": [
+          201,
+          1
+        ],
+        "terminal_control_unused": true
+      },
+      "probe_duration_s": 0.4,
+      "probe_fixed_window_s": [
+        0.06,
+        0.34
+      ],
+      "probe_initial_qpos_rad": 0.17,
+      "probe_initial_qvel_rad_s": 0.23,
+      "probe_samples": 201,
+      "probe_sensor_sigmas": {
+        "qpos": 0.002,
+        "qvel": 0.02
+      },
+      "probe_weighted_offsets": {
+        "qpos": "sigma_qpos*sin(window_sample_index*0.31)",
+        "qvel": "sigma_qvel*cos(window_sample_index*0.19)"
+      },
+      "residual_sign": "measured_minus_predicted",
+      "timestamp_policy": "verify accumulated state times, then canonical arange*dt grid; no timestep shift",
+      "timestamp_roundoff_tolerance_s": "1e-12 + 8*float64_epsilon*number_of_steps*max(1, horizon_s); rejects a timestep-sized shift",
+      "upstream_accumulated_clock_max_abs_error_s": 2.7755575615628914e-16,
+      "upstream_post_step_sensor_max_abs_error": 0.019475307165308306,
+      "upstream_sensor_timestamp_offset_s": 0.002,
+      "upstream_sensors_equal_pre_step": true
+    },
+    "probe_physical_config": {
+      "control_limit_nm": 1.5,
+      "damping_nm_s_per_rad": 0.15,
+      "initial_qpos_rad": 0.0,
+      "initial_qvel_rad_s": 0.0,
+      "link_length_m": 0.5,
+      "link_radius_m": 0.015,
+      "mass_kg": 1.2,
+      "motor_gain_nm_per_unit": 1.0,
+      "timestep_s": 0.002
+    },
+    "report_inspection": {
+      "confidence_intervals": "calculate_intervals available; not estimated by Milestone 1",
+      "executed_result_save_or_html_generation": false,
+      "html_entrypoint": "default_report(..., save_path=Path(directory), generate_videos=False)",
+      "html_output": "<directory>/report.html",
+      "nominal_report_label": "measured observations; differs from project's biased nominal model",
+      "save_results_outputs": [
+        "params_x_0.yaml",
+        "params_x_hat.yaml",
+        "results.pkl",
+        "confidence.pkl",
+        "<model_sequence_name>.xml"
+      ]
+    },
+    "required_exports_present": true,
+    "schema_version": "mujoco-sysid-lab.api-check.v1",
+    "source_records": {
+      "ModelSequences": {
+        "signature": "(name: 'str', spec: 'mujoco.MjSpec', sequence_name: 'str | Sequence[str]', initial_state: 'np.ndarray | Sequence[np.ndarray]', control: 'timeseries.TimeSeries | Sequence[timeseries.TimeSeries]', sensordata: 'timeseries.TimeSeries | Sequence[timeseries.TimeSeries]', allow_missing_sensors: 'bool' = False)",
+        "source_path": "mujoco/sysid/_src/trajectory.py",
+        "source_sha256": "2df04fe28b2ceba357392a89b8c8cb151bda54028a73550e81924b3db51b2595"
+      },
+      "Parameter": {
+        "signature": "(name: 'str', nominal: 'float | npt.ArrayLike', min_value: 'float | npt.ArrayLike', max_value: 'float | npt.ArrayLike', frozen: 'bool' = False, modifier: 'ModifierFn | None' = None)",
+        "source_path": "mujoco/sysid/_src/parameter.py",
+        "source_sha256": "052aa6ed8f3559484014b7f97e2ca445c4f39a994d64d3fc2744d6468b683b4a"
+      },
+      "ParameterDict": {
+        "signature": "(parameters: 'dict[str, Parameter] | None' = None)",
+        "source_path": "mujoco/sysid/_src/parameter.py",
+        "source_sha256": "052aa6ed8f3559484014b7f97e2ca445c4f39a994d64d3fc2744d6468b683b4a"
+      },
+      "ParameterDict.add": {
+        "signature": "(self, param: 'Parameter') -> 'None'",
+        "source_path": "mujoco/sysid/_src/parameter.py",
+        "source_sha256": "052aa6ed8f3559484014b7f97e2ca445c4f39a994d64d3fc2744d6468b683b4a"
+      },
+      "SignalTransform": {
+        "signature": "(normalize: 'bool' = True)",
+        "source_path": "mujoco/sysid/_src/signal_transform.py",
+        "source_sha256": "4ca3b55c49e0b7bed7062e43f7c19dba95d4c72617261718f251fa1590cf2a90"
+      },
+      "SignalTransform.apply": {
+        "signature": "(self, params: 'parameter.ParameterDict', sensordata_predicted: 'timeseries.TimeSeries', sensordata_measured: 'timeseries.TimeSeries', model: 'mujoco.MjModel', return_pred_all: 'bool', state: 'np.ndarray | None' = None, sensor_weights: 'Mapping[str, float] | None' = None) -> 'tuple[np.ndarray, timeseries.TimeSeries, timeseries.TimeSeries]'",
+        "source_path": "mujoco/sysid/_src/signal_transform.py",
+        "source_sha256": "4ca3b55c49e0b7bed7062e43f7c19dba95d4c72617261718f251fa1590cf2a90"
+      },
+      "TimeSeries": {
+        "signature": "(times: 'np.ndarray', data: 'np.ndarray', signal_mapping: 'SignalMappingType | None' = None) -> None",
+        "source_path": "mujoco/sysid/_src/timeseries.py",
+        "source_sha256": "c737dd5c35da5474a0fe16e168b30a26430e34573986019d6b23520678c8671c"
+      },
+      "TimeSeries.from_control_names": {
+        "signature": "(times: 'np.ndarray', data: 'np.ndarray', model: 'mujoco.MjModel', names: 'Sequence[str | tuple[str, SignalType]] | None' = None) -> 'TimeSeries'",
+        "source_path": "mujoco/sysid/_src/timeseries.py",
+        "source_sha256": "c737dd5c35da5474a0fe16e168b30a26430e34573986019d6b23520678c8671c"
+      },
+      "TimeSeries.from_names": {
+        "signature": "(times: 'np.ndarray', data: 'np.ndarray', model: 'mujoco.MjModel', names: 'Sequence[str | tuple[str, SignalType]] | None' = None) -> 'TimeSeries'",
+        "source_path": "mujoco/sysid/_src/timeseries.py",
+        "source_sha256": "c737dd5c35da5474a0fe16e168b30a26430e34573986019d6b23520678c8671c"
+      },
+      "apply_delayed_ts_window": {
+        "signature": "(ts: 'timeseries.TimeSeries', ts_delayed: 'timeseries.TimeSeries', min_delay: 'float', max_delay: 'float') -> 'timeseries.TimeSeries'",
+        "source_path": "mujoco/sysid/_src/signal_modifier.py",
+        "source_sha256": "43e7a32afa81233e0c053d20b91e50b01c1b7d57049fb39c397c1bbca54ea8d3"
+      },
+      "apply_param_modifiers": {
+        "signature": "(params: mujoco.sysid._src.parameter.ParameterDict, spec: mujoco._specs.MjSpec) -> mujoco._structs.MjModel",
+        "source_path": "mujoco/sysid/_src/model_modifier.py",
+        "source_sha256": "c01cf41ae462d6be693f623a055b496818a61491d475c3148ec91532a66f4b2b"
+      },
+      "apply_resample_and_delay": {
+        "signature": "(ts: 'timeseries.TimeSeries', times: 'np.ndarray', default_delay: 'float', sensor_delays: 'dict[str, float] | None' = None, predicted_data: 'bool' = True) -> 'timeseries.TimeSeries'",
+        "source_path": "mujoco/sysid/_src/signal_modifier.py",
+        "source_sha256": "43e7a32afa81233e0c053d20b91e50b01c1b7d57049fb39c397c1bbca54ea8d3"
+      },
+      "body_inertia_param": {
+        "signature": "(spec: mujoco._specs.MjSpec, model: mujoco._structs.MjModel, body_name: str, inertia_type: mujoco.sysid._src.parameter.InertiaType = <InertiaType.MassIpos: 1>, scale_rot_inertia: bool = False, mass_bound_mult: numpy.ndarray | None = None, ipos_bound_off: numpy.ndarray | None = None, stretch_bound_mult: numpy.ndarray | None = None, shear_bound_off: numpy.ndarray | None = None, param_name: str | None = None, modifier: Optional[Callable[[mujoco._specs.MjSpec, ForwardRef('Parameter')], object]] = None) -> mujoco.sysid._src.parameter.Parameter",
+        "source_path": "mujoco/sysid/_src/model_modifier.py",
+        "source_sha256": "c01cf41ae462d6be693f623a055b496818a61491d475c3148ec91532a66f4b2b"
+      },
+      "build_residual_fn": {
+        "signature": "(**captured_kwargs)",
+        "source_path": "mujoco/sysid/_src/residual.py",
+        "source_sha256": "ee5fe0176107b9438ef17a8a9edd17faf28ebaa07ad419355f10aae86f2a9640"
+      },
+      "calculate_intervals": {
+        "signature": "(residuals_star, J, alpha=0.05, lambda_zero_thresh=1e-15, v_zero_thresh=1e-08)",
+        "source_path": "mujoco/sysid/_src/optimize.py",
+        "source_sha256": "50d01241779397d59b2d0c41a60698b204fbe91264e065fd2761457e360952ec"
+      },
+      "create_initial_state": {
+        "signature": "(model: 'mujoco.MjModel', qpos: 'np.ndarray', qvel: 'np.ndarray | None' = None, act: 'np.ndarray | None' = None, qpos_names: 'Sequence[str] | None' = None, qvel_names: 'Sequence[str] | None' = None, act_names: 'Sequence[str] | None' = None) -> 'np.ndarray'",
+        "source_path": "mujoco/sysid/_src/trajectory.py",
+        "source_sha256": "2df04fe28b2ceba357392a89b8c8cb151bda54028a73550e81924b3db51b2595"
+      },
+      "default_report": {
+        "signature": "(models_sequences: collections.abc.Sequence[mujoco.sysid._src.trajectory.ModelSequences], initial_params: mujoco.sysid._src.parameter.ParameterDict, opt_params: mujoco.sysid._src.parameter.ParameterDict, residual_fn, opt_result: scipy.optimize._optimize.OptimizeResult, title='SysID', save_path=None, build_model: collections.abc.Callable[[mujoco.sysid._src.parameter.ParameterDict, mujoco._specs.MjSpec], mujoco._structs.MjModel] | None = <function apply_param_modifiers>, generate_videos=True) -> mujoco.sysid.report.builder.ReportBuilder",
+        "source_path": "mujoco/sysid/report/defaults.py",
+        "source_sha256": "6175c0b4c01e0d78bd66720986f8c34142c69029bf4de99e061e80b439c2603c"
+      },
+      "jacobian_fd": {
+        "signature": "(residual: Callable[[numpy.ndarray], numpy.ndarray], x: numpy.ndarray, r: numpy.ndarray, eps: numpy.float64, n_res: int, bounds: Optional[List[numpy.ndarray]] = None) -> Tuple[numpy.ndarray, int]",
+        "source_path": "mujoco/minimize.py",
+        "source_sha256": "39f5e171e63224db0bc8b56ac9df1c4cc36f454ddbee1f0129dfda6646bd9a71"
+      },
+      "optimize": {
+        "signature": "(initial_params: mujoco.sysid._src.parameter.ParameterDict, residual_fn: collections.abc.Callable[..., typing.Any], optimizer: Literal['scipy', 'mujoco', 'scipy_parallel_fd'] = 'mujoco', verbose: bool = True, check_conditioning: bool = False, **optimizer_kwargs) -> tuple[mujoco.sysid._src.parameter.ParameterDict, scipy.optimize._optimize.OptimizeResult]",
+        "source_path": "mujoco/sysid/_src/optimize.py",
+        "source_sha256": "50d01241779397d59b2d0c41a60698b204fbe91264e065fd2761457e360952ec"
+      },
+      "residual": {
+        "signature": "(x: 'np.ndarray', params: 'parameter.ParameterDict', models_sequences: 'list[ModelSequences]', build_model: 'BuildModelFn' = <function apply_param_modifiers>, modify_residual: 'ModifyResidualFn | None' = None, custom_rollout: 'CustomRolloutFn | None' = None, n_threads: 'int' = 12, return_pred_all: 'bool' = False, resample_true: 'bool' = True, sensor_weights: 'Mapping[str, float] | None' = None, enabled_observations: 'Sequence[tuple[str, timeseries.SignalType]]' = ())",
+        "source_path": "mujoco/sysid/_src/residual.py",
+        "source_sha256": "ee5fe0176107b9438ef17a8a9edd17faf28ebaa07ad419355f10aae86f2a9640"
+      },
+      "save_results": {
+        "signature": "(experiment_results_folder: str | os.PathLike[str], models_sequences: collections.abc.Sequence[mujoco.sysid._src.trajectory.ModelSequences], initial_params: mujoco.sysid._src.parameter.ParameterDict, opt_params: mujoco.sysid._src.parameter.ParameterDict, opt_result: scipy.optimize._optimize.OptimizeResult, residual_fn)",
+        "source_path": "mujoco/sysid/_src/io.py",
+        "source_sha256": "3d568931c68ef3e07b507288b92a275d08d1514ea52c58a57dec489fef2b0a73"
+      },
+      "scipy_backend_wrapper": {
+        "signature": "(x0: numpy.ndarray, residual_fn: collections.abc.Callable[..., typing.Any], bounds: tuple[numpy.ndarray, numpy.ndarray], use_mujoco_jac: bool = False, **kwargs) -> scipy.optimize._optimize.OptimizeResult",
+        "source_path": "mujoco/sysid/_src/optimize.py",
+        "source_sha256": "50d01241779397d59b2d0c41a60698b204fbe91264e065fd2761457e360952ec"
+      },
+      "sysid_rollout": {
+        "signature": "(models: 'mujoco.MjModel | Sequence[mujoco.MjModel]', datas: 'mujoco.MjData | Sequence[mujoco.MjData]', control_signal: 'Sequence[timeseries.TimeSeries] | timeseries.TimeSeries', initial_states: 'np.ndarray | Sequence[np.ndarray]', rollout_signal_mapping: 'timeseries.SignalMappingType | None' = None, rollout_state_mapping: 'timeseries.SignalMappingType | None' = None, ctrl_mapping: 'timeseries.SignalMappingType | None' = None) -> 'Sequence[SystemTrajectory]'",
+        "source_path": "mujoco/sysid/_src/trajectory.py",
+        "source_sha256": "2df04fe28b2ceba357392a89b8c8cb151bda54028a73550e81924b3db51b2595"
+      }
+    }
+  },
+  "command": {
+    "argv": [
+      ".venv/bin/python",
+      "scripts/verify_milestone1.py",
+      "--config",
+      "configs/milestone1.json",
+      "--output",
+      "artifacts/milestone1/20261012_seed101_verified"
+    ],
+    "working_directory": "."
+  },
+  "config": {
+    "content": {
+      "damping_bounds_nm_s_per_rad": {
+        "lower": 0.001,
+        "upper": 0.5
+      },
+      "duration_s": 1.0,
+      "experiment_id": "milestone1_deterministic_simulation",
+      "ground_truth": {
+        "control_limit_nm": 1.5,
+        "damping_nm_s_per_rad": 0.15,
+        "initial_qpos_rad": 0.0,
+        "initial_qvel_rad_s": 0.0,
+        "link_length_m": 0.5,
+        "link_radius_m": 0.015,
+        "mass_kg": 1.2,
+        "motor_gain_nm_per_unit": 1.0,
+        "timestep_s": 0.002
+      },
+      "mass_bounds_kg": {
+        "lower": 0.4,
+        "upper": 2.0
+      },
+      "nominal": {
+        "control_limit_nm": 1.5,
+        "damping_nm_s_per_rad": 0.04,
+        "initial_qpos_rad": 0.0,
+        "initial_qvel_rad_s": 0.0,
+        "link_length_m": 0.5,
+        "link_radius_m": 0.015,
+        "mass_kg": 0.8,
+        "motor_gain_nm_per_unit": 1.0,
+        "timestep_s": 0.002
+      },
+      "schema_version": "mujoco-sysid-lab.milestone1.v1",
+      "seed": 101
+    },
+    "path": "configs/milestone1.json",
+    "sha256": "eb06b0fbd0f2cae56a107cf116ac5f1709246e26f3e528c700d959fec69a6811"
+  },
+  "created_at_utc": "2026-10-13T04:52:48.365744+00:00",
+  "environment": {
+    "cpu": {
+      "chip": "Apple M4 Pro",
+      "core_description": "proc 12:8:4:0",
+      "logical_cores": 12,
+      "memory": "24 GB",
+      "source": "system_profiler filtered hardware fields"
+    },
+    "os": {
+      "architecture": "arm64",
+      "macos_version": "26.6.2",
+      "release": "25.6.0",
+      "system": "Darwin",
+      "version": "Darwin Kernel Version 25.6.0: Fri Jul 31 19:17:26 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T6041"
+    },
+    "thread_settings": {
+      "MKL_NUM_THREADS": "1",
+      "NUMEXPR_NUM_THREADS": "1",
+      "OMP_NUM_THREADS": "1",
+      "OPENBLAS_NUM_THREADS": "1",
+      "VECLIB_MAXIMUM_THREADS": "1"
+    }
+  },
+  "evidence_audit": {
+    "audit_passed": true,
+    "earlier_run": "artifacts/milestone1/20261012_seed101",
+    "earlier_run_audit_passed": false,
+    "earlier_run_reason": "active console log hash changed during writing; original retained",
+    "identification_performed": false,
+    "local_tests": {
+      "log": "artifacts/setup/pytest-milestone1-final.log",
+      "passed": 86,
+      "seconds": 1.6,
+      "sha256": "dda4b574957d0b4b9f5afa91bc2d145179a5d46d872bbd43207d814701aa48ef",
+      "warnings": 16
+    },
+    "raw_data_and_plot_hashes_verified": true,
+    "remote_ci": "not run",
+    "run_sha256": "386d43d4bfede96c1ff587adbc131ad5d7db2a83113e3881a986867edd074e6a",
+    "setup_input_hashes_verified": 5,
+    "simulation_plot_visually_inspected": true,
+    "source_commit": "4ad8657763b7568e1f16d92d3a3808cb739488c9",
+    "source_file_hashes_verified": 22
+  },
+  "excitation": {
+    "control_to_torque_gain": 1.0,
+    "kind": "verification_pulses",
+    "pulses": [
+      {
+        "end_exclusive_s": 0.3,
+        "start_s": 0.1,
+        "torque_nm": 0.7
+      },
+      {
+        "end_exclusive_s": 0.55,
+        "start_s": 0.4,
+        "torque_nm": -0.4
+      }
+    ],
+    "terminal_control_unused": true,
+    "zero_elsewhere": true
+  },
+  "experiment_id": "milestone1_deterministic_simulation",
+  "git": {
+    "commit": "4ad8657763b7568e1f16d92d3a3808cb739488c9",
+    "dirty": false,
+    "tracked_changes": [],
+    "untracked_files": []
+  },
+  "identification_performed": false,
+  "lock": {
+    "path": "uv.lock",
+    "sha256": "2f201119699b0607899e60ec58c3b72292d6a335842ddd9fdfa43ea1ecfc7451"
+  },
+  "measurement_noise": {
+    "enabled": false
+  },
+  "milestone": 1,
+  "model": {
+    "path": "model/pendulum.xml",
+    "sha256": "986dc43c33442c9d56785ca16237521c195ffac05341473cd80db8ec764340b7"
+  },
+  "mujoco_version": "3.15.0",
+  "package_versions": {
+    "absl-py": "2.5.1",
+    "colorama": "0.4.6",
+    "contourpy": "1.4.0",
+    "cycler": "0.12.1",
+    "etils": "1.14.0",
+    "fonttools": "4.66.1",
+    "fsspec": "2026.9.0",
+    "glfw": "2.10.2",
+    "imageio": "2.38.1",
+    "imageio-ffmpeg": "0.6.0",
+    "iniconfig": "2.3.1",
+    "jinja2": "3.1.6",
+    "kiwisolver": "1.5.1",
+    "markupsafe": "3.0.4",
+    "matplotlib": "3.10.6",
+    "mujoco": "3.15.0",
+    "mujoco-system-identification-lab": "0.1.0",
+    "narwhals": "2.27.1",
+    "numpy": "2.3.3",
+    "packaging": "26.3",
+    "pillow": "12.3.0",
+    "plotly": "7.1.0",
+    "pluggy": "1.6.0",
+    "psutil": "7.2.2",
+    "pygments": "2.21.0",
+    "pyopengl": "3.1.10",
+    "pyparsing": "3.3.3",
+    "pytest": "8.4.2",
+    "python-dateutil": "2.9.0.post0",
+    "pyyaml": "6.0.3",
+    "scipy": "1.16.2",
+    "six": "1.17.0",
+    "tabulate": "0.10.0",
+    "typing_extensions": "4.16.0",
+    "websockets": "17.2",
+    "zipp": "4.1.1"
+  },
+  "python": {
+    "executable": ".venv/bin/python",
+    "executable_scope": "repository-relative",
+    "implementation": "CPython",
+    "version": "3.12.5"
+  },
+  "randomness_used": false,
+  "raw_evidence_archive": {
+    "command": [
+      "tar",
+      "-czf",
+      "artifacts/milestone1/20261012_evidence.tar.gz",
+      "artifacts/milestone1/20261012_seed101",
+      "artifacts/milestone1/20261012_seed101_verified",
+      "artifacts/setup"
+    ],
+    "contents": "Verified run, prior run with retained audit failure, completed setup/test/console logs",
+    "path": "artifacts/milestone1/20261012_evidence.tar.gz",
+    "sha256": "d77761a7cfa2c655a10f1f49a530eb5fb9c349544b46bc38aa723de8b44158ca"
+  },
+  "runtime_environment": {
+    "MPLBACKEND": "Agg",
+    "MPLCONFIGDIR": "artifacts/matplotlib",
+    "XDG_CACHE_HOME": "artifacts/cache"
+  },
+  "schema_version": 1,
+  "scope": "Deterministic synthetic simulation and installed API verification only",
+  "seed": 101,
+  "setup_records": [
+    {
+      "path": "artifacts/setup/commands.json",
+      "sha256": "912daaa6cf58f22955a7dee6451017e83395bec3ba8852e26c9916435a186266"
+    },
+    {
+      "path": "artifacts/setup/uv-lock.log",
+      "sha256": "d16bc7907b8f122e910c8f03b5d7b790e4ad3828adee2c60c7309902815cb539"
+    },
+    {
+      "path": "artifacts/setup/uv-sync.log",
+      "sha256": "fabc97e50df9dba3378f7d29ad313c3336f6685882ac92ac85a70c0ca049ff6b"
+    },
+    {
+      "path": "artifacts/setup/pytest-milestone1.log",
+      "sha256": "96d579ea6c4c4b5416923152c35e05657666dc6275b37af86b6afa06d88589e3"
+    },
+    {
+      "path": "artifacts/setup/pytest-milestone1-final.log",
+      "sha256": "dda4b574957d0b4b9f5afa91bc2d145179a5d46d872bbd43207d814701aa48ef"
+    }
+  ],
+  "simulation": {
+    "control_intervals": 500,
+    "data": {
+      "path": "trajectory.npz",
+      "sha256": "9dcf394367f86c3c6174969117eff64f819f7b68da03724bbbe068771f740244"
+    },
+    "duration_s": 1.0,
+    "finite": true,
+    "max_sensor_state_error": 0.0,
+    "numeric_repeat_equality": {
+      "controls": true,
+      "qpos": true,
+      "qvel": true,
+      "sensordata": true,
+      "timestamps": true
+    },
+    "plot": {
+      "path": "simulation.png",
+      "sha256": "9816ec4a4cf33a5a47977821582d3734f3c23c52e7a9ca6ddd9ec79379a8c3d9"
+    },
+    "qpos_range_rad": [
+      -0.15119750885104402,
+      0.19547893784840073
+    ],
+    "qvel_range_rad_s": [
+      -1.0390338845087446,
+      0.984975984079174
+    ],
+    "samples": 501,
+    "simulation_seconds": [
+      0.001816375006455928,
+      0.0017327500390820205
+    ],
+    "timestep_s": 0.002
+  },
+  "source_sha256": {
+    ".gitignore": "d73a7c9509f42e731909a543bbe5bedb72038cb2c9e8b67a10fdc648d076dd0f",
+    ".python-version": "6950a3d7a481c16de40e3c721441564e076496a28665a045f00a74c85cc231f1",
+    "AGENTS.md": "67385591d03452f1edad36e8b8eb08fcb68761342c8ea0c8769c1782ec350dff",
+    "README.md": "769cc937eb61fb01e446ad19b746e2b6dfc60c08b2943fd17445ed3c12dbab3e",
+    "configs/milestone1.json": "eb06b0fbd0f2cae56a107cf116ac5f1709246e26f3e528c700d959fec69a6811",
+    "intend.md": "aba2aa3664c566c88a6c06c52c9bed3f9d0ad9c30bf23e0a85d28f9281d790f1",
+    "model/pendulum.xml": "986dc43c33442c9d56785ca16237521c195ffac05341473cd80db8ec764340b7",
+    "plan.md": "3a55bd9857f39a70b9fd593eb143d0df3d8c179d192df454009c8776ad02312e",
+    "pyproject.toml": "93ab0aa4bb1ea403a5f453665277d1d854a80e9105d74891b10001a1b66fd95f",
+    "scripts/verify_milestone1.py": "a669610fe4aa19a8bf76e58b559ebf4e5a1c40b0d682c19bfcd69ee4fa3ed151",
+    "spec.md": "5a908aa0c0805a2fab7d469f077a7471482adc7a6eeebd399bd7c56649069c9c",
+    "src/mujoco_sysid_lab/__init__.py": "19a9717ef49d313a8e0e239cfc72181bdd820c4130d49f73f5d173e7a45b2bb5",
+    "src/mujoco_sysid_lab/api_check.py": "f444319994329cb64ae1af93c54678bde658373be4867fca5d38aaf8966f6543",
+    "src/mujoco_sysid_lab/config.py": "11b2f99d83ff2dae54e53ac610f99edaa1228316421d6f11bbef133866b0d8f7",
+    "src/mujoco_sysid_lab/provenance.py": "37e356e3a026fdaaedc801bfa287147961007e97941c3dc370a4eca935fc7d78",
+    "src/mujoco_sysid_lab/simulation.py": "494ece56bbe17ba4e3d4c969abc56d9b51502dbcfffc7ed9ded5a9956b3c8a8d",
+    "tests/test_config.py": "ae383ee14678908059a85667efed61e38678a90604257820a1f986a6d7051e16",
+    "tests/test_milestone1_runner.py": "b38d03cd18e36814dac9a4a41db971228818d83a4fb8588c6b3d63860402dff2",
+    "tests/test_provenance.py": "3a42c8c8a7b104b49102717d0712cc3bf19e1d2d0a87095b273020641313ffe2",
+    "tests/test_simulation.py": "f221f573c371b745a3d77c84f2601169a6dc70bffff39391898449702d97aea6",
+    "tests/test_sysid_contract.py": "fe21b831ffab9898a00f91fc4d57f4f5b373eb5bd27cd28e6fadba83cd509181",
+    "uv.lock": "2f201119699b0607899e60ec58c3b72292d6a335842ddd9fdfa43ea1ecfc7451"
+  },
+  "source_snapshot_required": false,
+  "status": "passed",
+  "verification_seconds": 0.6805002909968607
+}
