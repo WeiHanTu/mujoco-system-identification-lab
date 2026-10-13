@@ -1,0 +1,474 @@
+{
+  "schema_version": "mujoco-sysid-lab.evidence.v1",
+  "experiment_id": "synthetic_pendulum_evidence_v1",
+  "truth_config_file": "ground_truth_v1.json",
+  "nominal": {
+    "mass_kg": 0.8,
+    "damping_nm_s_per_rad": 0.04,
+    "timestep_s": 0.002,
+    "link_length_m": 0.5,
+    "link_radius_m": 0.015,
+    "motor_gain_nm_per_unit": 1.0,
+    "control_limit_nm": 1.5,
+    "initial_qpos_rad": 0.0,
+    "initial_qvel_rad_s": 0.0
+  },
+  "mass_bounds_kg": {
+    "lower": 0.4,
+    "upper": 2.0
+  },
+  "damping_bounds_nm_s_per_rad": {
+    "lower": 0.001,
+    "upper": 0.5
+  },
+  "delay_bounds_s": {
+    "lower": 0.0,
+    "upper": 0.06
+  },
+  "duration_s": 8.0,
+  "zero_control_prefix_s": 0.1,
+  "prehistory_s": 0.06,
+  "evaluation_window_s": [
+    0.06,
+    7.94
+  ],
+  "noise_seeds": [
+    101,
+    102,
+    103,
+    104,
+    105
+  ],
+  "primary_seed": 101,
+  "sensor_sigmas": {
+    "qpos": 0.002,
+    "qvel": 0.02
+  },
+  "noise": {
+    "distribution": "independent_zero_mean_gaussian",
+    "bit_generator": "PCG64",
+    "seed_sequence": [
+      "noise_seed",
+      "noise_group_id",
+      "trajectory_id",
+      "sensor_id"
+    ],
+    "sensor_ids": {
+      "qpos": 0,
+      "qvel": 1
+    },
+    "paired_group_id": 0,
+    "weak_group_id": 1,
+    "process_noise": false
+  },
+  "starts": {
+    "S0": {
+      "mass_kg": 0.8,
+      "damping_nm_s_per_rad": 0.04,
+      "delay_s": 0.002
+    },
+    "S1": {
+      "mass_kg": 1.7,
+      "damping_nm_s_per_rad": 0.3,
+      "delay_s": 0.05
+    },
+    "S2": {
+      "mass_kg": 0.5,
+      "damping_nm_s_per_rad": 0.4,
+      "delay_s": 0.01
+    }
+  },
+  "optimizer": {
+    "backend": "scipy_parallel_fd",
+    "method": "trf",
+    "loss": "linear",
+    "max_iters": 200,
+    "budget_meaning": "scipy_max_nfev",
+    "ftol": 1e-08,
+    "xtol": 1e-08,
+    "gtol": 1e-08,
+    "x_scale": "free_parameter_bound_widths",
+    "diff_step": 1e-05,
+    "finite_difference_semantics": "eps*max(1,abs(x)); sign toward bounds midpoint; clipped candidate",
+    "rollout_workers": 1,
+    "numerical_library_threads": 1,
+    "delay_only_start_s": 0.002,
+    "selection": "lowest_finite_training_objective_including_nonconverged",
+    "objective": "0.5*sum(noise_normalized_residual**2)",
+    "residual_sign": "measured_minus_prediction",
+    "amplitude_normalization": false
+  },
+  "phase_lag": {
+    "window_margin_s": 0.12,
+    "lag_min_s": -0.06,
+    "lag_max_s": 0.06,
+    "lag_step_s": 0.002,
+    "tie_tolerance": 1e-12,
+    "tie_rule": "smallest_absolute_lag_then_negative",
+    "minimum_peak_correlation": 0.2,
+    "minimum_signal_std": "sensor_noise_sigma",
+    "positive_sign": "measurements_lag_candidate_prediction"
+  },
+  "metrics": {
+    "primary": "heldout_trajectory_prediction",
+    "per_trajectory": [
+      "qpos_rmse",
+      "qvel_rmse",
+      "qpos_p95_absolute_error",
+      "qvel_p95_absolute_error",
+      "noise_normalized_rmse"
+    ],
+    "normalized_rmse": "sqrt(mean((qpos_error/sigma_qpos)**2+(qvel_error/sigma_qvel)**2)/2)",
+    "split_aggregation": "sqrt(mean(per_trajectory_rmse**2)); equal_trajectory_weight",
+    "relative_improvement": "1-identified_rmse/nominal_rmse; null_reason_if_zero_denominator",
+    "bound_hit_fraction": 0.001,
+    "consistent_bound_hit_seed_count": 3,
+    "latent_clean": "secondary_diagnostic_only",
+    "seed_aggregation": [
+      "median",
+      "minimum",
+      "maximum",
+      "finite_count",
+      "failures",
+      "nonconvergence"
+    ],
+    "missing_diagnostics": "null_with_reason"
+  },
+  "criteria": {
+    "physical_relative_error_max": 0.1,
+    "minimum_recovery_seed_count": 4,
+    "fixed_seed_denominator": 5,
+    "heldout_median_improvement_min": 0.2,
+    "require_nonnegative_each_heldout_median": true,
+    "delay_absolute_error_max_s": 0.002,
+    "smoke_runtime_target_s": 60.0,
+    "full_runtime_target_s": 900.0,
+    "noiseless_single_parameter_relative_error_max": 0.001,
+    "delay_physical_eligibility_relative_error_max": 0.1,
+    "delay_joint_requires_successful_delay_only": true,
+    "weak_or_mismatch_positive_result_required": false,
+    "missing_required_seed_counts_as_failure": true
+  },
+  "evidence_matrix": [
+    {
+      "id": "A1",
+      "scenario": "matched",
+      "training_ids": [
+        "train_multisine",
+        "train_prbs"
+      ],
+      "free_parameters": [
+        "mass_kg"
+      ],
+      "noise_seeds": [
+        101
+      ],
+      "start_ids": [
+        "S0"
+      ],
+      "fits": 1,
+      "prerequisite": "oracle_assisted_fixed_true_damping"
+    },
+    {
+      "id": "A2",
+      "scenario": "matched",
+      "training_ids": [
+        "train_multisine",
+        "train_prbs"
+      ],
+      "free_parameters": [
+        "damping_nm_s_per_rad"
+      ],
+      "noise_seeds": [
+        101
+      ],
+      "start_ids": [
+        "S0"
+      ],
+      "fits": 1,
+      "prerequisite": "oracle_assisted_fixed_true_mass"
+    },
+    {
+      "id": "B",
+      "scenario": "matched",
+      "training_ids": [
+        "train_multisine",
+        "train_prbs"
+      ],
+      "free_parameters": [
+        "mass_kg",
+        "damping_nm_s_per_rad"
+      ],
+      "noise_seeds": [
+        101,
+        102,
+        103,
+        104,
+        105
+      ],
+      "start_ids": [
+        "S0",
+        "S1",
+        "S2"
+      ],
+      "fits": 15,
+      "prerequisite": null
+    },
+    {
+      "id": "weak",
+      "scenario": "matched",
+      "training_ids": [
+        "weak_step"
+      ],
+      "free_parameters": [
+        "mass_kg",
+        "damping_nm_s_per_rad"
+      ],
+      "noise_seeds": [
+        101,
+        102,
+        103,
+        104,
+        105
+      ],
+      "start_ids": [
+        "S0",
+        "S1",
+        "S2"
+      ],
+      "fits": 15,
+      "prerequisite": null
+    },
+    {
+      "id": "delay_excluded",
+      "scenario": "delayed",
+      "training_ids": [
+        "train_multisine",
+        "train_prbs"
+      ],
+      "free_parameters": [
+        "mass_kg",
+        "damping_nm_s_per_rad"
+      ],
+      "noise_seeds": [
+        101,
+        102,
+        103,
+        104,
+        105
+      ],
+      "start_ids": [
+        "S0",
+        "S1",
+        "S2"
+      ],
+      "fits": 15,
+      "prerequisite": null
+    },
+    {
+      "id": "C_delay_only",
+      "scenario": "delayed",
+      "training_ids": [
+        "train_multisine",
+        "train_prbs"
+      ],
+      "free_parameters": [
+        "delay_s"
+      ],
+      "noise_seeds": [
+        101,
+        102,
+        103,
+        104,
+        105
+      ],
+      "start_ids": [
+        "S0"
+      ],
+      "fits": 5,
+      "prerequisite": "same_seed_B_training_selected_winner_both_physical_errors_le_0.1"
+    },
+    {
+      "id": "C_joint",
+      "scenario": "delayed",
+      "training_ids": [
+        "train_multisine",
+        "train_prbs"
+      ],
+      "free_parameters": [
+        "mass_kg",
+        "damping_nm_s_per_rad",
+        "delay_s"
+      ],
+      "noise_seeds": [
+        101,
+        102,
+        103,
+        104,
+        105
+      ],
+      "start_ids": [
+        "S0",
+        "S1",
+        "S2"
+      ],
+      "fits": 15,
+      "prerequisite": "same_seed_C_delay_only_finite_abs_delay_error_le_one_timestep_and_timing_tests_pass"
+    },
+    {
+      "id": "E",
+      "scenario": "mismatch",
+      "training_ids": [
+        "train_multisine",
+        "train_prbs"
+      ],
+      "free_parameters": [
+        "mass_kg",
+        "damping_nm_s_per_rad"
+      ],
+      "noise_seeds": [
+        101,
+        102,
+        103,
+        104,
+        105
+      ],
+      "start_ids": [
+        "S0",
+        "S1",
+        "S2"
+      ],
+      "fits": 15,
+      "prerequisite": null
+    }
+  ],
+  "registration": {
+    "status": "frozen_before_first_identification_evidence_run",
+    "version_change_policy": "new_version_and_explanation; retain_earlier_evidence; no_outcome_driven_threshold_changes",
+    "default_dataset_trajectory_ids": [
+      "train_multisine",
+      "train_prbs",
+      "heldout_chirp",
+      "heldout_pulse"
+    ],
+    "record_all_failures": true,
+    "truth_visibility": "separate_generator_evaluation_only_config; estimator_receives_no_physical_truth",
+    "measurement_delay_convention": "measured_y(t)=clean_y(t-delay)+noise(t); no_extrapolation",
+    "terminal_control": "unused_terminal_value; energy_and_rms_use_controls[:-1]",
+    "gravity_m_s2": [
+      0.0,
+      0.0,
+      -9.81
+    ],
+    "integrator": "implicitfast",
+    "armature": 0.0,
+    "dry_friction": 0.0,
+    "contacts": false,
+    "angle_convention": "unwrapped_radians_q0_downward",
+    "initial_state_estimation": false,
+    "estimator_inputs": [
+      "training_controls",
+      "training_measured_qpos",
+      "training_measured_qvel",
+      "explicit_known_initial_state",
+      "nominal_known_constants_and_parameter_bounds"
+    ]
+  },
+  "trajectories": {
+    "train_multisine": {
+      "trajectory_id": 0,
+      "split": "train",
+      "kind": "multisine",
+      "duration_s": 8.0,
+      "settings": {
+        "frequencies_hz": [
+          0.25,
+          0.65,
+          1.15,
+          1.8
+        ],
+        "amplitudes_nm": [
+          0.2,
+          0.3,
+          0.25,
+          0.15
+        ],
+        "phases_rad": [
+          0.0,
+          0.7,
+          1.3,
+          2.1
+        ],
+        "active_rms_nm": 0.55
+      }
+    },
+    "train_prbs": {
+      "trajectory_id": 1,
+      "split": "train",
+      "kind": "prbs",
+      "duration_s": 8.0,
+      "settings": {
+        "choices": [
+          -1.0,
+          -0.6,
+          0.0,
+          0.6,
+          1.0
+        ],
+        "block_duration_s": 0.25,
+        "active_rms_nm": 0.55,
+        "seed_sequence": [
+          314159,
+          100,
+          1
+        ]
+      }
+    },
+    "heldout_chirp": {
+      "trajectory_id": 2,
+      "split": "heldout",
+      "kind": "chirp",
+      "duration_s": 8.0,
+      "settings": {
+        "start_frequency_hz": 0.2,
+        "end_frequency_hz": 2.0,
+        "amplitude_nm": 0.8,
+        "onset_s": 0.1
+      }
+    },
+    "heldout_pulse": {
+      "trajectory_id": 3,
+      "split": "heldout",
+      "kind": "pulse",
+      "duration_s": 8.0,
+      "settings": {
+        "pulses": [
+          {
+            "start_s": 0.5,
+            "end_s": 1.2,
+            "amplitude_nm": 1.25
+          },
+          {
+            "start_s": 2.5,
+            "end_s": 3.3,
+            "amplitude_nm": -0.9
+          },
+          {
+            "start_s": 5.0,
+            "end_s": 5.45,
+            "amplitude_nm": 0.95
+          }
+        ]
+      }
+    },
+    "weak_step": {
+      "trajectory_id": 4,
+      "split": "train",
+      "kind": "step",
+      "duration_s": 16.0,
+      "settings": {
+        "amplitude_nm": 0.55
+      }
+    }
+  }
+}

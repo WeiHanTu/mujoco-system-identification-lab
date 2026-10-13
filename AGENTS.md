@@ -2,7 +2,7 @@
 
 Project: `mujoco-system-identification-lab`.
 Remote supplied by the user: `https://github.com/WeiHanTu/mujoco-system-identification-lab.git` (local origin).
-Status: Milestone 1 complete and verified; stop before Milestone 2 until continuation.
+Status: Milestone 2 authorized and in progress; stop before Milestone 3 until continuation.
 Planning date: 2026-10-12, America/Los_Angeles.
 
 ## Working style and authorization
@@ -10,7 +10,7 @@ Planning date: 2026-10-12, America/Los_Angeles.
 - Be direct and ruthless. Do not sugarcoat problems or agree for the sake of it.
 - Read this file, `intend.md`, `spec.md`, and `plan.md` before making changes.
 - This is an independent project under `/Users/weihantu/mujoco-lab/mujoco-system-identification-lab`. Never add its implementation to `sensor-fusion-replay-cpp`.
-- The user approved the plan on 2026-10-12. The current authorization covers Milestone 1: pinned environment, installed API verification, minimal model/simulation, tests, and provenance. Later milestones require continuation under the checkpoint rule below.
+- The user approved the plan on 2026-10-12 and subsequently authorized Milestone 2 with "next". Current work covers reproducible matched-model datasets, deterministic measurement noise, nominal/oracle evaluation, plots, and registration. No parameter identification is authorized until Milestone 3 continuation.
 - After each numbered milestone, stop, verify the stated gate, report evidence and failures, and wait for continuation unless the user explicitly authorizes several milestones together. This checkpoint rule comes from the user's execution-order instruction.
 - The user supplied the existing GitHub repository and authorized connecting it as local origin. No upload, publication, or messages to other people are authorized by the planning request or by supplying the remote alone.
 
