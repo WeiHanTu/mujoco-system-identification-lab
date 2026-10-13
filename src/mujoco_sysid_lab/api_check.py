@@ -72,7 +72,6 @@ def make_aligned_observation_hook(
         max_delay = float(delay_parameter.max_value[0])
         if not np.isfinite([min_delay, max_delay]).all() or not 0 <= min_delay < max_delay:
             raise ValueError("delay bounds must be finite, ordered, and nonnegative")
-        transform.delay("*", delay_parameter)
 
     def aligned_hook(params, predicted, measured, model, return_pred_all, state=None):
         if (model.nq, model.nv, model.na, model.nsensordata) != (1, 1, 0, 2):
@@ -118,8 +117,19 @@ def make_aligned_observation_hook(
             current_delay = float(params[delay_parameter.name].value[0])
             if not np.isfinite(current_delay) or not min_delay <= current_delay <= max_delay:
                 raise ValueError("delay candidate is outside registered bounds")
+            # SignalTransform.delay performs a second raw-subtraction window
+            # crop. In 3.15, a canonical 1.2 s grid ends its safe window at
+            # 1.1400000000000001, while 1.2 - .060 is 1.14; upstream exact
+            # searchsorted drops that valid final sample. After the explicit
+            # all-bounds support check above, resample via the official delay
+            # helper onto the fixed measured grid. SignalTransform then handles
+            # the unchanged measured-minus-predicted/noise-weighted objective.
+            if current_delay != 0.0:
+                clean = sysid.apply_resample_and_delay(clean, measured.times, current_delay)
         output = transform.apply(params, clean, measured, model, return_pred_all)
-        if not np.array_equal(output[2].times, measured.times):
+        if (not np.array_equal(output[2].times, measured.times)
+                or not np.array_equal(output[1].times, measured.times)
+                or output[0].shape != (measured.times.size, 2)):
             raise ValueError("official delay window changed the fixed observation samples")
         return output
 

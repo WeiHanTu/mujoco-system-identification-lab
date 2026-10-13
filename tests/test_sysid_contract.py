@@ -183,6 +183,32 @@ def test_eight_second_clock_roundoff_keeps_fixed_delay_boundaries(model):
     np.testing.assert_allclose(residual, 0.0, rtol=0, atol=1e-10)
 
 
+@pytest.mark.parametrize("candidate", [0.0, 0.024, 0.060])
+def test_one_ulp_delay_window_crop_is_reproduced_and_fixed_without_changing_samples(model, candidate):
+    times = np.arange(601) * model.opt.timestep
+    state = np.column_stack((times[1:], times[1:], 2*times[1:]+1))
+    initial = np.array([0., 0., 1.])
+    clean = sysid.TimeSeries.from_names(times, np.column_stack((times, 2*times+1)),
+                                       model, ["qpos", "qvel"])
+    mask = (times >= .06-1e-12) & (times <= times[-1]-.06+1e-12)
+    query = times[mask]-.024
+    measured = sysid.TimeSeries.from_names(times[mask], np.column_stack((query, 2*query+1)),
+                                          model, ["qpos", "qvel"])
+    assert measured.times[-1] == 1.1400000000000001
+    assert times[-1]-.060 == 1.14
+    assert sysid.apply_delayed_ts_window(measured, clean, 0., .060).times.size == 540
+    params = sysid.ParameterDict()
+    params.add(sysid.Parameter("delay", .024, 0., .060))
+    params.update_from_vector(np.array([candidate]))
+    hook = make_aligned_observation_hook(initial, {"qpos": 1., "qvel": 1.}, params["delay"])
+    residual, predicted, returned = hook(params, clean, measured, model, False, state=state)
+    assert residual.shape == (541, 2)
+    np.testing.assert_array_equal(predicted.times, measured.times)
+    np.testing.assert_array_equal(returned.times, measured.times)
+    np.testing.assert_allclose(residual, np.broadcast_to(
+        [candidate-.024, 2*(candidate-.024)], residual.shape), rtol=0, atol=1e-14)
+
+
 def test_official_batched_finite_difference_is_bounded(api_record):
     checks = api_record["finite_difference_checks"]
     assert checks["official_batched_fd_bounds_respected"]

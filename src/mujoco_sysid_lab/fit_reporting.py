@@ -306,12 +306,14 @@ def save_official_fit(directory: Path, problem: Any, execution: Any, *,
     """
     from mujoco.sysid.report.sections.row import RowSection
 
-    if fit_scope not in ("oracle_assisted_single_parameter", "joint_physical"):
-        raise ValueError("fit_scope must be oracle_assisted_single_parameter or joint_physical")
+    if fit_scope not in ("oracle_assisted_single_parameter", "joint_physical", "registered_ablation"):
+        raise ValueError("Unsupported fit_scope")
     scope_note = (
         "Synthetic oracle-assisted single-parameter study; no real robot, HIL, or sim-to-real validation. "
         if fit_scope == "oracle_assisted_single_parameter" else
-        "Synthetic joint physical parameter study: mass and damping are jointly estimated from training observations; no physical truth is supplied to optimization or start selection. No real robot, HIL, or sim-to-real validation. "
+        ("Synthetic joint physical parameter study: mass and damping are jointly estimated from training observations; no physical truth is supplied to optimization or start selection. No real robot, HIL, or sim-to-real validation. "
+         if fit_scope == "joint_physical" else
+         "Synthetic registered ablation: free parameters are " + ", ".join(problem.free_parameters) + ". Only complete training trajectories enter optimization. Fixed physics for delay-only identification comes from the same-seed training-selected physical fit. No real robot, HIL, or sim-to-real validation. ")
     )
     output = Path(directory)
     if output.exists():

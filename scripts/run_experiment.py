@@ -79,7 +79,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default="configs/evidence_v1.json")
     parser.add_argument("--registration", default="docs/results/registration_v1.json")
-    parser.add_argument("--milestone", type=int, choices=[3, 4], default=3)
+    parser.add_argument("--milestone", type=int, choices=[3, 4, 6, 7, 8, 9], default=9)
     parser.add_argument("--dataset", help="Existing matched seed-101 dataset manifest or directory")
     parser.add_argument("--output", help="New ignored directory; omit for a UTC-timestamped run")
     args = parser.parse_args()
@@ -95,6 +95,12 @@ def main() -> int:
         from mujoco_sysid_lab.joint_experiment import run_milestone4
         try:
             return run_milestone4(ROOT, args, output)
+        except (ValueError, OSError, KeyError) as error:
+            parser.error(str(error))
+    if args.milestone >= 6:
+        from mujoco_sysid_lab.study_runner import run_study
+        try:
+            return run_study(ROOT, args, output, through=args.milestone)
         except (ValueError, OSError, KeyError) as error:
             parser.error(str(error))
 

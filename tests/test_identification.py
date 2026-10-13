@@ -184,7 +184,7 @@ def test_frozen_optimizer_options_and_bound_width_scaling(study, training):
 @pytest.mark.parametrize("free,start,error", [
     ((), {}, "unique mass"),
     (("mass_kg", "mass_kg"), {"mass_kg": .8}, "unique mass"),
-    (("delay_s",), {"delay_s": .024}, "unique mass"),
+    (("motor_gain",), {"motor_gain": 1.0}, "unique mass"),
     (("mass_kg",), {"damping_nm_s_per_rad": .04}, "exactly the free"),
     (("mass_kg",), {"mass_kg": .2}, "inside registered bounds"),
     (("mass_kg",), {"mass_kg": float("nan")}, "finite"),
@@ -271,3 +271,138 @@ def test_initial_residual_failure_does_not_claim_optimizer_invocation(study, tra
     assert problem.call_counts["initial"]["residual_calls"] == 1
     assert problem.call_counts["optimization"]["residual_calls"] == 0
     assert problem.residual_fn.phase == "external"
+
+
+@pytest.fixture(scope="module")
+def delayed_training(study, training):
+    """Known 24 ms delay with real zero equilibrium history; no edge padding."""
+    delay = .024
+    dt = study.timestep_s
+    prehistory = np.arange(-round(study.prehistory_s/dt), 0) * dt
+    sequences = []
+    for sequence in training.sequences:
+        support = np.concatenate((prehistory, sequence.timestamps))
+        query = sequence.timestamps - delay
+        assert query.min() >= support[0] and query.max() <= support[-1]
+        delayed = []
+        for values in (sequence.measured_qpos, sequence.measured_qvel):
+            clean = np.concatenate((np.zeros(prehistory.size), values[:, 0]))
+            delayed.append(np.interp(query, support, clean)[:, None])
+        sequences.append(replace(sequence, measured_qpos=delayed[0], measured_qvel=delayed[1]))
+    return replace(training, sequences=tuple(sequences))
+
+
+def test_shared_positive_delay_preserves_fixed_window_and_residual_shape(study, delayed_training, true_physics):
+    problem = build_problem(delayed_training, MODEL, true_physics, study,
+                            ("delay_s",), {"delay_s": .002})
+    counts = []
+    residuals = {}
+    expected_times = [measured.times.copy() for measured in problem.sequences[0].sensordata]
+    for delay in (0., .024, .060):
+        residuals[delay] = problem.evaluate(np.array([delay]))
+        counts.append(residuals[delay].size)
+        _, predictions, records = problem.residual_fn(np.array([delay]), problem.params.copy(), return_pred_all=True)
+        for index in range(2):
+            np.testing.assert_array_equal(predictions[index][0].times, expected_times[index])
+            np.testing.assert_array_equal(records[index][0].times, expected_times[index])
+    assert counts == [2164, 2164, 2164]
+    assert np.linalg.norm(residuals[.024]) < 1e-8
+    assert np.linalg.norm(residuals[0.]) > 1
+    assert np.linalg.norm(residuals[.060]) > 1
+    assert problem.params["delay_s"].modifier is None
+    np.testing.assert_array_equal(problem.optimizer_options["x_scale"], [.060])
+
+
+def test_delay_excluded_model_is_exactly_zero_delay_baseline(study, delayed_training, true_physics):
+    excluded = build_problem(delayed_training, MODEL, true_physics, study,
+                             ("mass_kg",), {"mass_kg": 1.2})
+    included = build_problem(delayed_training, MODEL, true_physics, study,
+                             ("mass_kg", "delay_s"), {"mass_kg": 1.2, "delay_s": .002})
+    np.testing.assert_array_equal(excluded.evaluate(np.array([1.2])),
+                                  included.evaluate(np.array([1.2, 0.])))
+    assert "delay_s" not in excluded.params.keys()
+
+
+def test_delay_only_then_joint_noiseless_recovery_smoke(study, delayed_training, true_physics):
+    # Separate reduced implementation fixture; fixed truth physics is not the
+    # registered C delay-only fit, which must use that seed's immutable B fit.
+    delay_only = build_problem(delayed_training, MODEL, true_physics, study,
+                               ("delay_s",), {"delay_s": .002})
+    delay_result = delay_only.run()
+    assert abs(float(delay_result.optimized_params["delay_s"].value[0]) - .024) <= study.timestep_s
+    assert delay_result.optimize_result.success
+    joint = build_problem(delayed_training, MODEL, study.nominal, study,
+                          ("mass_kg", "damping_nm_s_per_rad", "delay_s"),
+                          {"mass_kg": .8, "damping_nm_s_per_rad": .04, "delay_s": .002})
+    result = joint.run()
+    assert result.optimize_result.success
+    for name, truth in (("mass_kg", 1.2), ("damping_nm_s_per_rad", .15)):
+        assert abs(float(result.optimized_params[name].value[0]) - truth)/truth <= .001
+    assert abs(float(result.optimized_params["delay_s"].value[0]) - .024) <= study.timestep_s
+    assert result.optimize_result.jac.shape == (2164, 3)
+    assert result.final_residual.shape == result.initial_residual.shape
+
+
+@pytest.mark.parametrize("delay", [-.001, .060001, float("nan"), True])
+def test_delay_start_outside_bound_or_nonfinite_is_rejected(study, training, delay):
+    with pytest.raises(ValueError, match="start delay_s must be finite and inside"):
+        build_problem(training, MODEL, study.nominal, study, ("delay_s",), {"delay_s": delay})
+
+
+def test_unsafe_registered_delay_support_fails_without_candidate_dependent_cropping(study, training):
+    from mujoco_sysid_lab.config import ParameterBounds
+    unsafe = replace(study, delay_bounds_s=ParameterBounds(0., .08))
+    problem = build_problem(training, MODEL, study.nominal, unsafe, ("delay_s",), {"delay_s": .002})
+    with pytest.raises(ValueError, match="unsafe for delay bounds"):
+        problem.evaluate(np.array([.002]))
+
+
+def test_three_parameter_order_batched_residual_and_delay_do_not_modify_dynamics(study, delayed_training):
+    problem = build_problem(delayed_training, MODEL, study.nominal, study,
+                            ("delay_s", "damping_nm_s_per_rad", "mass_kg"),
+                            {"mass_kg": .8, "damping_nm_s_per_rad": .04, "delay_s": .002})
+    assert problem.params.keys() == ["delay_s", "damping_nm_s_per_rad", "mass_kg"]
+    np.testing.assert_array_equal(problem.optimizer_options["x_scale"], [.06, .499, 1.6])
+    columns = np.array([[.0, .024], [.15, .15], [1.2, 1.2]])
+    batched, _, _ = problem.residual_fn(columns, problem.params.copy())
+    for index, matrix in enumerate(batched):
+        for column in range(2):
+            scalar, _, _ = problem.residual_fn(columns[:, column], problem.params.copy())
+            np.testing.assert_array_equal(matrix[:, column], scalar[index])
+    candidates = []
+    for column in range(2):
+        params = problem.params.copy()
+        params.update_from_vector(columns[:, column])
+        candidates.append(sysid.apply_param_modifiers(params, problem.spec.copy()))
+    for field in ("body_mass", "body_inertia", "body_ipos", "dof_damping"):
+        np.testing.assert_array_equal(getattr(candidates[0], field), getattr(candidates[1], field))
+    assert candidates[0].body_mass[1] == 1.2
+    assert candidates[0].dof_damping[0] == .15
+    assert candidates[0].dof_frictionloss[0] == 0
+
+
+def test_weak_training_requires_explicit_whitelist_and_one_rollout(study, true_physics):
+    model = compile_model(MODEL, true_physics)
+    times, controls, _ = generate_control(study, "weak_step")
+    clean = simulate(model, times[:601], controls[:601])
+    sequence = TrainingSequence("weak_step", 4, clean.timestamps, clean.controls,
+                                clean.qpos, clean.qvel, np.array([0., 0., 0.]))
+    weak = TrainingDataset(101, (sequence,))
+    with pytest.raises(ValueError, match="two registered training"):
+        build_problem(weak, MODEL, study.nominal, study, ("mass_kg",), {"mass_kg": .8})
+    problem = build_problem(weak, MODEL, study.nominal, study,
+                            ("mass_kg", "damping_nm_s_per_rad"),
+                            {"mass_kg": .8, "damping_nm_s_per_rad": .04}, training_ids=("weak_step",))
+    assert problem.training_ids == ("weak_step",)
+    assert problem.sequences[0].sequence_name == ["weak_step"]
+    assert problem.sequences[0].control[0].data.shape == (601, 1)
+    assert problem.sequences[0].sensordata[0].data.shape == (541, 2)
+    assert problem.evaluate(np.array([1.2, .15])).shape == (1082,)
+    assert problem.call_counts["external"]["logical_rollouts"] == 1
+
+
+@pytest.mark.parametrize("selected", [("heldout_chirp",), ("train_multisine",), (), ["weak_step"]])
+def test_explicit_training_selection_cannot_authorize_heldout_or_partial_rich_data(study, training, selected):
+    with pytest.raises(ValueError, match="training_ids"):
+        build_problem(training, MODEL, study.nominal, study,
+                      ("mass_kg",), {"mass_kg": .8}, training_ids=selected)

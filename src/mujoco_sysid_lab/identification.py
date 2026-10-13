@@ -23,7 +23,7 @@ from scipy.optimize import OptimizeResult
 from mujoco_sysid_lab.api_check import make_aligned_observation_hook
 from mujoco_sysid_lab.config import ModelConfig
 from mujoco_sysid_lab.dataset import (
-    DATASET_SCHEMA_VERSION, TRAIN_TRAJECTORIES, TRAJECTORY_IDS,
+    DATASET_SCHEMA_VERSION, TRAIN_TRAJECTORIES,
     TrainingDataset, TrainingSequence,
 )
 from mujoco_sysid_lab.experiment_config import StudyConfig
@@ -31,6 +31,7 @@ from mujoco_sysid_lab.simulation import load_spec
 
 
 PHYSICAL_PARAMETERS = ("mass_kg", "damping_nm_s_per_rad")
+FREE_PARAMETERS = (*PHYSICAL_PARAMETERS, "delay_s")
 _COUNTER_KEYS = ("residual_calls", "candidate_columns", "batched_residual_calls",
                  "logical_rollouts", "logical_perturbed_rollouts")
 
@@ -249,7 +250,13 @@ def _copy_build_model(params: sysid.ParameterDict, spec: mujoco.MjSpec) -> mujoc
 
 
 def _validate_training(training: TrainingDataset, physical: ModelConfig,
-                       study: StudyConfig) -> None:
+                       study: StudyConfig, training_ids: tuple[str, ...] = TRAIN_TRAJECTORIES) -> None:
+    if (not isinstance(training_ids, tuple)
+            or training_ids not in (TRAIN_TRAJECTORIES, ("weak_step",))):
+        raise ValueError("training_ids must be the registered rich pair or ('weak_step',); held-out fitting is forbidden")
+    if any(name not in study.trajectories or study.trajectories[name].split != "train"
+           for name in training_ids):
+        raise ValueError("requested fitting trajectories must be registered training IDs")
     if type(training) is not TrainingDataset:
         raise ValueError("fitting requires the sanitized TrainingDataset interface")
     if (type(training.dataset_schema_version) is not int
@@ -258,12 +265,15 @@ def _validate_training(training: TrainingDataset, physical: ModelConfig,
     if any(type(sequence) is not TrainingSequence for sequence in training.sequences):
         raise ValueError("training inputs must use the sanitized TrainingSequence interface")
     names = tuple(sequence.trajectory_name for sequence in training.sequences)
-    if names != TRAIN_TRAJECTORIES:
-        raise ValueError("fit input must contain exactly the two registered training trajectories")
+    if names != training_ids:
+        if training_ids == TRAIN_TRAJECTORIES:
+            raise ValueError("fit input must contain exactly the two registered training trajectories")
+        raise ValueError("fit input must contain exactly the explicitly selected weak_step training trajectory")
     if training.seed not in study.noise_seeds:
         raise ValueError("training seed is outside registered seeds")
     for sequence in training.sequences:
-        if sequence.trajectory_id != TRAJECTORY_IDS[sequence.trajectory_name]:
+        if (type(sequence.trajectory_id) is not int
+                or sequence.trajectory_id != study.trajectories[sequence.trajectory_name].trajectory_id):
             raise ValueError("training trajectory identity is inconsistent")
         times = sequence.timestamps
         if (not isinstance(times, np.ndarray) or times.dtype.kind not in "fiu"
@@ -289,30 +299,36 @@ def _validate_training(training: TrainingDataset, physical: ModelConfig,
 
 def build_problem(training: TrainingDataset, model_path: Path, physical: ModelConfig,
                   study: StudyConfig, free_parameters: tuple[str, ...],
-                  start: Mapping[str, float]) -> FitProblem:
+                  start: Mapping[str, float], *,
+                  training_ids: tuple[str, ...] = TRAIN_TRAJECTORIES) -> FitProblem:
     """Build a bounded official fit using only typed training observations.
 
     ``physical`` stamps every fixed quantity, including A1/A2's known nuisance.
-    ``start`` must contain exactly the requested free physical parameter names.
-    No delay fitting is implemented before its separate milestone gate.
+    ``start`` contains exactly the requested free physical/measurement names.
+    Delay is a shared bounded observation transform, never a dynamics modifier.
+    Explicit training_ids can select only the rich pair or weak_step; held-out
+    controls cannot enter optimization. A delay-only caller stamps its immutable
+    training-selected physical values into ``physical``.
     """
     if mujoco.__version__ != "3.15.0":
         raise RuntimeError("identification requires released MuJoCo 3.15.0")
-    _validate_training(training, physical, study)
+    _validate_training(training, physical, study, training_ids)
     if (not isinstance(free_parameters, tuple) or not free_parameters
             or len(set(free_parameters)) != len(free_parameters)
-            or any(name not in PHYSICAL_PARAMETERS for name in free_parameters)):
-        raise ValueError("free_parameters must name unique mass and/or damping parameters")
+            or any(name not in FREE_PARAMETERS for name in free_parameters)):
+        raise ValueError("free_parameters must name unique mass, damping, and/or delay parameters")
     if not isinstance(start, Mapping) or set(start) != set(free_parameters):
         raise ValueError("start must contain exactly the free parameter names")
     bounds = {"mass_kg": study.mass_bounds_kg,
-              "damping_nm_s_per_rad": study.damping_bounds_nm_s_per_rad}
+              "damping_nm_s_per_rad": study.damping_bounds_nm_s_per_rad,
+              "delay_s": study.delay_bounds_s}
     for name in free_parameters:
         value = start[name]
         if (isinstance(value, (bool, np.bool_)) or not isinstance(value, (float, int))
                 or not np.isfinite(value) or not bounds[name].contains(value)):
             raise ValueError(f"start {name} must be finite and inside registered bounds")
-    starting_physics = replace(physical, **start)
+    starting_physics = replace(physical, **{name: value for name, value in start.items()
+                                           if name in PHYSICAL_PARAMETERS})
     spec = load_spec(model_path, starting_physics)
     model = spec.compile()
     if (model.nq, model.nv, model.na, model.nu, model.nsensordata) != (1, 1, 0, 1, 2):
@@ -327,12 +343,14 @@ def build_problem(training: TrainingDataset, model_path: Path, physical: ModelCo
                 mass_bound_mult=np.array([bound.lower, bound.upper]) / start[name],
                 param_name=name,
             ))
-        else:
+        elif name == "damping_nm_s_per_rad":
             def damping_modifier(candidate_spec, parameter):
                 candidate_spec.joint("hinge").damping = [float(parameter.value[0]), 0.0, 0.0]
 
             params.add(sysid.Parameter(name, start[name], bound.lower, bound.upper,
                                        modifier=damping_modifier))
+        else:
+            params.add(sysid.Parameter(name, start[name], bound.lower, bound.upper))
     controls, observations, initial_states = [], [], []
     for sequence in training.sequences:
         initial = sysid.create_initial_state(model, sequence.initial_state[1:2],
@@ -355,9 +373,10 @@ def build_problem(training: TrainingDataset, model_path: Path, physical: ModelCo
         ))
         initial_states.append(initial)
     sequences = [sysid.ModelSequences(
-        "pendulum", spec, list(TRAIN_TRAJECTORIES), initial_states, controls, observations,
+        "pendulum", spec, list(training_ids), initial_states, controls, observations,
     )]
-    hook = make_aligned_observation_hook(initial_states[0], study.sensor_sigmas)
+    delay_parameter = params["delay_s"] if "delay_s" in free_parameters else None
+    hook = make_aligned_observation_hook(initial_states[0], study.sensor_sigmas, delay_parameter)
     official = sysid.build_residual_fn(
         models_sequences=sequences, modify_residual=hook,
         build_model=_copy_build_model, n_threads=1,
@@ -371,4 +390,4 @@ def build_problem(training: TrainingDataset, model_path: Path, physical: ModelCo
                                                 "xtol", "gtol", "diff_step")}
     options["x_scale"] = params.get_bounds()[1] - params.get_bounds()[0]
     return FitProblem(spec, params, sequences, counter, options, free_parameters,
-                      TRAIN_TRAJECTORIES, training.seed, counter)
+                      training_ids, training.seed, counter)
