@@ -20,7 +20,7 @@ Normalized RMSE combines position and velocity after dividing by their known noi
 - [Parameter table](parameter_table.csv): all 172 free-parameter slots across the 82 fits.
 - [Baseline parameter table](baseline_parameters.csv): nominal/oracle absolute and relative errors, bounds, fixed-value interpretation, and all seed/scenario rows. Fixed zero-delay assumptions are not optimizer bound pins.
 - [Official selected matched report](../report.html) and [ablation reports](../reports/full): upstream HTML copied without modification. Its “nominal” observations mean measured signals; parameter-change errors compare against the starting reference.
-- [Frozen registration](registration_v1.json), [verification](verification.json), [independent evidence audit](evidence_audit.json), and [local archive manifest](archive.json).
+- [Frozen registration](registration_v1.json), [final repository verification](professional_verification.json), [Milestone 9 verification](verification.json), [independent evidence audit](evidence_audit.json), and [local archive manifest](archive.json).
 - [Checkpoint records](../milestones): historical Milestones 1–8, including preserved implementation failures and their corrections.
 
 The recorded full-study command took **57.17 s** on the documented Apple M4 Pro CPU environment, executing **70 new optimizations and reusing 12 verified earlier fits**. This is not a measured cold 82-fit runtime. Final rendering, audit, and archive production have separate records. Remote CI has not been executed.
@@ -39,4 +39,4 @@ To regenerate only the compact overview from retained results:
 uv run --locked python scripts/summarize_results.py --summary docs/results/summary.json
 ```
 
-This performs no simulation, optimization, or start selection. It creates a fresh ignored producer directory, preserves the full summary bytes, and updates only the generated public overview.
+This performs no simulation, optimization, or start selection. It creates a fresh ignored producer directory, preserves the full summary bytes, and updates the generated overview and baseline parameter table.

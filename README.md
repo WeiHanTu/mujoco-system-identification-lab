@@ -73,7 +73,7 @@ The official pipeline uses `MjSpec`, `ParameterDict`, `TimeSeries`, explicit ini
 
 ## Verification and scope
 
-[Milestone 9 audit](docs/milestones/09_final_audit.md) records **541 passing tests**, the CPU smoke, independent reproduction of all 82 fits' residuals/metrics, visual report checks, and the verified local archive. [Verification metadata](docs/results/verification.json) and [archive inventory](docs/results/archive.json) include exact commands, configs, seeds, versions, CPU/OS, source commits/hashes, and dirty-state snapshots. Earlier implementation failures are retained. GitHub displays HTML source; [the results index](docs/results/README.md) explains local report viewing.
+[Final repository verification](docs/professional_review.md) passed **594 tests**, the CPU smoke, a cached replay with zero new optimizer calls, and wheel/source-package integrity checks. The [Milestone 9 audit](docs/milestones/09_final_audit.md) preserves the earlier 541-test checkpoint, independent reproduction of all 82 fits' residuals/metrics, visual report checks, and the verified local archive. [Verification metadata](docs/results/professional_verification.json) and [archive inventory](docs/results/archive.json) include exact commands, configs, seeds, versions, CPU/OS, source commits/hashes, and dirty-state snapshots. Earlier implementation failures are retained. GitHub displays HTML source; [the results index](docs/results/README.md) explains local report viewing.
 
 **Verified locally:** synthetic parameter recovery; held-out synthetic prediction; sensitivity to excitation, delay, noise, initialization, and the registered mismatch; official CPU workflow and recorded environment/runtime. Five seeds provide descriptive evidence.
 
